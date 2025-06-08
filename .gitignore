@@ -1,0 +1,54 @@
+# Project specific
+data/
+
+
+# Python stuff
+**/__pycache__/
+.venv/
+venv/
+env/
+.python-version
+**/.ipynb_checkpoints
+.ruff_cache/
+
+# Rust stuff
+target/
+Cargo.lock
+
+# Logs and databases
+**/*.log
+**/*.sql
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+
+# System and backup files
+*.bak
+**/.tmp/
+**/tmp/
+**/.temp/
+**/temp/
+**/*.tmp
+**/*.temp
+**/*.swp
+**/*.old
+**/.env
+**/*.lock
+.DS_Store
+
+
+# Bad IDEs (NeoVIM, by the way)
+**/.idea/
+**/.vscode/
+
+# Archive files
+**/*.7z
+**/*.jar
+**/*.rar
+**/*.zip
+**/*.gz
+**/*.iso
+**/*.tar
+**/*.pkg
+**/*.msi
+
