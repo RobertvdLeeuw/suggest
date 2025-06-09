@@ -13,13 +13,13 @@ dependencies = [
     "scikit-learn>=1.6.1",
     "seaborn>=0.13.2",
     "spotipy>=2.25.1",
-    "tensorflow-rocm",
+    # "tensorflow-rocm",
     "umap-learn>=0.5.7",
     "xmltodict>=0.14.2",
 ]
 
-[tool.uv.sources]
-tensorflow-rocm = { url = "https://repo.radeon.com/rocm/manylinux/rocm-rel-6.3.3/tensorflow_rocm-2.16.2-cp312-cp312-manylinux_2_28_x86_64.whl" }
+# [tool.uv.sources]
+# tensorflow-rocm = { url = "https://repo.radeon.com/rocm/manylinux/rocm-rel-6.3.3/tensorflow_rocm-2.16.2-cp312-cp312-manylinux_2_28_x86_64.whl" }
 
 # [tool.uv.sources]
 # torch = [
@@ -37,5 +37,5 @@ tensorflow-rocm = { url = "https://repo.radeon.com/rocm/manylinux/rocm-rel-6.3.3
 # url = "https://download.pytorch.org/whl/cu128"
 # explicit = true
 
-[tool.marimo.runtime]
-output_max_bytes = 100_000_000
+# [tool.marimo.runtime]
+# output_max_bytes = 100_000_000

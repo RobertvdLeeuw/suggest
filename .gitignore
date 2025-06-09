@@ -2,6 +2,9 @@
 data/
 
 
+# General
+.direnv/
+
 # Python stuff
 **/__pycache__/
 .venv/
@@ -33,7 +36,7 @@ Cargo.lock
 **/*.swp
 **/*.old
 **/.env
-**/*.lock
+# **/*.lock
 .DS_Store
 
 

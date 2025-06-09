@@ -262,8 +262,6 @@
                   export REPO_ROOT=$(git rev-parse --show-toplevel)  # TODO: This could be useful for nvim or other tools to find project root.
                   
                   export PATH="${virtualenv}/bin:$PATH" # Let Python know about the virtualenv for imports
-                  echo "TensorFlow ROCm environment ready."
-                  echo "Test GPU detection with: python -c \"import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))\""
                 '';
               };
         };

@@ -1,0 +1,102 @@
+from objects import Metric, Trajectory
+
+from metrics.reduce import trust_cont
+
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+
+import numpy as np
+import pandas as pd
+
+
+def moving_average(a, n=3):
+    ret = np.cumsum(a, dtype=float)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
+
+
+COLORS = ["#1f77b4", "#ff7f0e", "#5b3491", "#37c42d"]
+LINES = ["solid", "dot", "dash", "longdash", "dashdot", "longdashdot"]
+
+# Use dash for stuff like legend/slicers
+def plot_all(trajectories: list[Trajectory], metrics: list[Metric] = [], moving_avg: int = 15) -> go.Figure:
+    if not isinstance(trajectories, list):
+        trajectories = [trajectories]
+    if not isinstance(metrics, list):
+        metrics = [metrics]
+
+    missing = [f"{t.model_name}: {m.name}" for m in metrics for t in trajectories if m.name not in t.metrics]
+    assert all(missing), f"Required metric(s) missing for some trajectories:\n\t{'\n\t'.join(missing)}"
+
+    assert len(trajectories) > 4, "That'll look like an epileptic attack, retard. Back to the drawing board with you!"
+
+    fig = make_subplots(
+        rows=len(metrics), 
+        cols=1,
+        subplot_titles=[m.name for m in metrics],
+        vertical_spacing=0.1,
+        # specs=[[{"secondary_y": False} for _ in range(len(histories))] for _ in range(2)]
+    )
+
+    for i, m in enumerate(metrics, start=1):
+        for j, (t, col) in enumerate(zip(trajectories, COLORS)):
+            for line_style, (component_name, component_values) in zip(LINES, t.metrics[m].items()):
+                fig.add_trace(
+                    go.Scatter(
+                        x=list(range(len(component_values) - moving_avg + 1)),
+                        y=moving_average(component_values, moving_avg),
+                        name=component_name,
+                        legendgroup=t.model_name,
+                        showlegend=component_name != "" and j == 1,  # Only when multiple components and on first model.
+                        line={"width": 2, "color": col, "dash": line_style}
+                    ),
+                    row=i, col=1
+                )
+    fig.update_xaxes(title_text="Steps", row=len(metrics), col=1)
+    fig.update_layout(
+        title_text=f'Model Performance (moving avg of {moving_avg})',
+        showlegend=True
+    )
+
+    return fig
+
+
+def filter_sparse_unliked(data: pd.DataFrame, frac: float) -> pd.DataFrame:
+    return pd.concat([data[data.score == "not"].sample(frac=frac), 
+                      data[data.score == "near"].sample(frac=frac),
+                      data[data.score.isin(["liked", "loved"])]]).sort_values( by="score")
+
+
+def scatter_3d(embeddings: pd.DataFrame, reduced: pd.DataFrame, filter_rate: float):
+    assert 0 <= filter_rate <= 1
+
+    trust, cont = trust_cont(embeddings, reduced)
+    reduced_sparse_umap = filter_sparse_unliked(reduced, filter_rate)
+    
+    reduced_sparse_umap["size"] = size
+    fig = px.scatter_3d(data_frame=reduced_sparse_umap,
+                        x="x", y="y", z="z", 
+                        color="score",
+                        color_discrete_map={'not':'red',
+                                            'near':'orange',
+                                            'liked':'green',
+                                            'loved':'darkgreen'},
+                        title=f"Reduced Embeddings (trustworthiness: {trust:.3f}, continuity: {cont:.3f})",
+                        hover_data={"x": False, 
+                                    "y": False, 
+                                    "z": False,  
+                                    "size": False,  
+                                    "name": True,
+                                    "chunk": True},
+                        size="size",
+                        size_max=size,
+                        opacity=opacity.value,
+                        # width=800,
+                        # height=700
+                        )
+
+    for l, _ in enumerate(fig_3d.data):
+        fig.data[l].marker.line.width = 0
+
+    return fig
