@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from copy import deepcopy
+
 import pandas as pd
 import numpy as np
 
@@ -22,11 +24,14 @@ class TrainEvent(Enum):  # Used to define when to calc what metric.
 class Metric(ABC):
     name: str
     on_event: TrainEvent
-    start_format: dict[str, list] | list = []  # dict when metric has subcomponents.
+    start_format: dict[str, list] | list = []  # Dict when metric has subcomponents.
+    agg_how: str = ""
 
     def __init__(self, **kwargs):
         super().__init__()
-        self.values = self.start_format
+        self.values = deepcopy(self.start_format)
+
+        self.agg_how = kwargs.get("agg_how", "")
 
     def __iter__():
         """Important for plotting later on. Some metrics have multiple components, so we need to specify how to iterate over and overlay components onto same plot."""
@@ -37,7 +42,7 @@ class Metric(ABC):
         if isinstance(self.start_format, dict) and all(isinstance(component, list) for component in self.start_format.values()):
             return self.values
 
-        raise NotImplemented(f"Iter pattern not implement for object of structure: {self.start_format}")
+        raise NotImplementedError(f"Iter pattern not implement for object of structure: {self.start_format}")
 
     def calc(self, event: TrainEvent, *args, **kwargs):
         if event != self.on_event:
@@ -50,7 +55,32 @@ class Metric(ABC):
         pass
 
     def __repr__(self) -> str:
-        return f"{self.name} on {self.on_event} initialized as {self.start_format}:\n\t{self.values}"  # TODO: Too large for human readable. Make something like Series.describe() with head() (head?).
+        if self.start_format == []:
+            body = pd.Series(self.values).describe()
+        elif isinstance(self.start_format, dict) and all(isinstance(component, list) for component in self.start_format.values()):
+            body = {k: pd.Series(v).describe() for k, v in self.values.items()}
+        else: 
+            raise NotImplementedError(f"Repr pattern not implement for object of structure: {self.start_format}")
+
+        return f"{self.name} on {self.on_event} initialized as {self.start_format}:\n\t{body}"
+
+    def __len__(self) -> int:
+        if self.start_format == []:
+            return len(self.values)
+
+        if isinstance(self.start_format, dict) and all(isinstance(component, list) for component in self.start_format.values()):
+            return len(list(self.values.values())[0])
+
+        raise NotImplementedError(f"Len pattern not implement for object of structure: {self.start_format}")
+
+    def items(self) -> tuple[list[str], list]:
+        if self.start_format == []:
+            return [("", self.values)]
+
+        if isinstance(self.start_format, dict) and all(isinstance(component, list) for component in self.start_format.values()):
+            return self.values.items()
+
+        raise NotImplementedError(f"Items pattern not implement for object of structure: {self.start_format}")
 
 
 @dataclass
@@ -60,7 +90,7 @@ class Trajectory:
     T: int
 
     def __repr__(self) -> str:
-        return f"Model: {self.model_name} (T={self.T}), Metrics:\n- {'\n- '.join([str(m) for m in self.metrics.values()])}"
+        return f"Model: {self.model_name} (T={self.T})\nMetrics:\n- {'\n- '.join([str(m) for m in self.metrics.values()])}"
 
 class Model(ABC):
     name: str

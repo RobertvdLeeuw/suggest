@@ -7,9 +7,9 @@ import pandas as pd
 class SongValuesUCB(Metric):
     name = "Song values by components (regression, UCB, and combined)."
     on_event = TrainEvent.STEP_START
-    start_format = {"Base Reward": [],
+    start_format = {"Total": [],
                     "UCB Component": [],
-                    "Total": []}
+                    "Base Reward": []}
 
     def calc_inner(self, 
                    exploration_matrix: np.ndarray, 

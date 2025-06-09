@@ -10,6 +10,7 @@ def _():
 
     from models.linear import LinUCB
     from reduce import pca
+    from functools import partial
 
     import pandas as pd
 
@@ -22,14 +23,35 @@ def _():
     from metrics.general import GoodSongsLeft
     from metrics.linear import SongValuesUCB
 
-    t = model.train(reduced, metrics=[SongValuesUCB, GoodSongsLeft], T=1000)
-
-    from plots import plot_all
+    t = model.train(reduced, metrics=[SongValuesUCB, 
+                                      GoodSongsLeft], T=1000)
 
     t
-    #mo.ui.plotly(
-    #    plot_all([t], [SongValuesUCB, GoodSongsLeft])
-    #)
+    return GoodSongsLeft, LinUCB, SongValuesUCB, mo, reduced, t
+
+
+@app.cell
+def _(GoodSongsLeft, LinUCB, SongValuesUCB, reduced):
+    t2 = LinUCB(n_dim=250, alpha=3, feature_start=-1).train(reduced, metrics=[SongValuesUCB, 
+                                                   GoodSongsLeft], T=1000)
+    return (t2,)
+
+
+@app.cell
+def _(GoodSongsLeft, SongValuesUCB, mo, t, t2):
+    from plots import plot_all
+
+    mo.ui.plotly(
+        plot_all([t, t2], [GoodSongsLeft(), 
+                       SongValuesUCB(agg_how="max"), 
+                       SongValuesUCB(agg_how="mean")])
+    )
+    return
+
+
+@app.cell
+def _(t):
+    len([t])
     return
 
 

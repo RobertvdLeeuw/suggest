@@ -44,7 +44,10 @@ class LinUCB(Model):
         assert T > 0
 
         songs_left = list(embeddings["name"].unique())
-        trajectory = Trajectory(T=T, metrics={m.name: m(good_songs=len(songs_left)) for m in metrics}, model_name=self.name)
+        n_good_songs = len(embeddings[embeddings.score.isin(["liked", "loved"])]["name"].unique())
+
+        trajectory = Trajectory(metrics={m.name: m(good_songs=n_good_songs) for m in metrics},
+                                model_name=self.name, T=T)
 
         self.exploration_matrix = np.identity(self.n_dim)
         self.feature_coeffs = np.full(self.n_dim, self.feature_start)

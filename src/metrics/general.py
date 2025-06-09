@@ -12,7 +12,7 @@ class GoodSongsLeft(Metric):
     name = "Good songs left in dataset"
     on_event = TrainEvent.REWARD_OBSERVED
 
-    def __init__(self, good_songs: int, **kwargs):
+    def __init__(self, good_songs: int=0, **kwargs):
         super().__init__()
         self.values.append(good_songs)
 

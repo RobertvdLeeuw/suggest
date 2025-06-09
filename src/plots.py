@@ -5,7 +5,6 @@ from metrics.reduce import trust_cont
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-
 import numpy as np
 import pandas as pd
 
@@ -27,28 +26,42 @@ def plot_all(trajectories: list[Trajectory], metrics: list[Metric] = [], moving_
         metrics = [metrics]
 
     missing = [f"{t.model_name}: {m.name}" for m in metrics for t in trajectories if m.name not in t.metrics]
-    assert all(missing), f"Required metric(s) missing for some trajectories:\n\t{'\n\t'.join(missing)}"
+    assert missing == [], f"Required metric(s) missing for some trajectories:\n\t{'\n\t'.join(missing)}"
 
-    assert len(trajectories) > 4, "That'll look like an epileptic attack, retard. Back to the drawing board with you!"
+    assert len(trajectories) < 4, "That'll look like an epileptic attack, retard. Back to the drawing board with you!"
 
     fig = make_subplots(
         rows=len(metrics), 
         cols=1,
         subplot_titles=[m.name for m in metrics],
         vertical_spacing=0.1,
+        shared_xaxes=True,
         # specs=[[{"secondary_y": False} for _ in range(len(histories))] for _ in range(2)]
     )
+    fig['layout'].update(height=300*len(metrics))
 
     for i, m in enumerate(metrics, start=1):
         for j, (t, col) in enumerate(zip(trajectories, COLORS)):
-            for line_style, (component_name, component_values) in zip(LINES, t.metrics[m].items()):
+            for line_style, (component_name, component_values) in zip(LINES, t.metrics[m.name].items()):
+                if isinstance(component_values[0], dict):
+                    component_values = [list(values_at_t.values()) for values_at_t in component_values]
+                    match m.agg_how:
+                        case "mean":
+                            component_values = np.mean(component_values, axis=1)
+
+                        case "max":
+                            component_values = np.max(component_values, axis=1)
+
+                        case _:
+                            raise NotImplementedError(f"Unknown aggregation method: '{m.agg_how}'")
+
                 fig.add_trace(
                     go.Scatter(
                         x=list(range(len(component_values) - moving_avg + 1)),
                         y=moving_average(component_values, moving_avg),
                         name=component_name,
                         legendgroup=t.model_name,
-                        showlegend=component_name != "" and j == 1,  # Only when multiple components and on first model.
+                        showlegend= i == 1,  # Only when multiple components and on first model.
                         line={"width": 2, "color": col, "dash": line_style}
                     ),
                     row=i, col=1
@@ -61,11 +74,10 @@ def plot_all(trajectories: list[Trajectory], metrics: list[Metric] = [], moving_
 
     return fig
 
-
 def filter_sparse_unliked(data: pd.DataFrame, frac: float) -> pd.DataFrame:
     return pd.concat([data[data.score == "not"].sample(frac=frac), 
                       data[data.score == "near"].sample(frac=frac),
-                      data[data.score.isin(["liked", "loved"])]]).sort_values( by="score")
+                      data[data.score.isin(["liked", "loved"])]]).sort_values(by="score")
 
 
 def scatter_3d(embeddings: pd.DataFrame, reduced: pd.DataFrame, filter_rate: float):
