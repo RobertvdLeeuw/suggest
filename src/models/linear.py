@@ -29,7 +29,7 @@ class LinUCB(Model):
         explor_inv = np.linalg.inv(self.exploration_matrix)
         coeff = explor_inv @ self.feature_coeffs
 
-        embeddings = embeddings[embeddings["name"].isin(songs_left)]
+        # embeddings = embeddings[embeddings["name"].isin(songs_left)]  # Slower because pandas.
 
         all_chunks = embeddings.drop(columns=METADATA_COLS).to_numpy()
         song_indices = embeddings.groupby('name').indices

@@ -20,7 +20,7 @@ class SongValuesUCB(Metric):
         coeff = explor_inv @ feature_coeffs
 
         all_chunks = embeddings.drop(columns=METADATA_COLS).to_numpy()
-        song_indices = embeddings.groupby('name').indices
+        song_indices = embeddings.groupby('song').indices
 
         uncertainty_terms = alpha * np.sqrt(np.sum(all_chunks @ explor_inv * all_chunks, axis=1))
         predicted_rewards = all_chunks @ coeff

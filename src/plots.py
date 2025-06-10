@@ -1,8 +1,9 @@
-from objects import Metric, Trajectory
+from objects import Metric, Trajectory, METADATA_COLS
 
 from metrics.reduce import trust_cont
 
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 
 import numpy as np
@@ -80,21 +81,26 @@ def filter_sparse_unliked(data: pd.DataFrame, frac: float) -> pd.DataFrame:
                       data[data.score.isin(["liked", "loved"])]]).sort_values(by="score")
 
 
-def scatter_3d(embeddings: pd.DataFrame, reduced: pd.DataFrame, filter_rate: float):
+def scatter_3d(embeddings: pd.DataFrame, reduced: pd.DataFrame, 
+               filter_rate: float = 0.3, opacity: float = 0.8):
     assert 0 <= filter_rate <= 1
+    assert 0 <= opacity <= 1
 
     trust, cont = trust_cont(embeddings, reduced)
     reduced_sparse_umap = filter_sparse_unliked(reduced, filter_rate)
     
-    reduced_sparse_umap["size"] = size
-    fig = px.scatter_3d(data_frame=reduced_sparse_umap,
+    reduced_sparse_umap["size"] = 10
+    score_sequence = {"not": 1, "near": 2, "liked": 3, "loved": 4}
+    fig = px.scatter_3d(data_frame=reduced_sparse_umap.sort_values(by="score", 
+                                                                   key=lambda col: col.apply(lambda x: score_sequence[x])),
                         x="x", y="y", z="z", 
                         color="score",
                         color_discrete_map={'not':'red',
                                             'near':'orange',
                                             'liked':'green',
                                             'loved':'darkgreen'},
-                        title=f"Reduced Embeddings (trustworthiness: {trust:.3f}, continuity: {cont:.3f})",
+                        title=f"Reduced Embeddings",
+                        subtitle=f"Trustworthiness: {trust:.3f}, Continuity: {cont:.3f}",
                         hover_data={"x": False, 
                                     "y": False, 
                                     "z": False,  
@@ -102,13 +108,13 @@ def scatter_3d(embeddings: pd.DataFrame, reduced: pd.DataFrame, filter_rate: flo
                                     "name": True,
                                     "chunk": True},
                         size="size",
-                        size_max=size,
-                        opacity=opacity.value,
+                        size_max=10,
+                        opacity=opacity,
                         # width=800,
                         # height=700
                         )
 
-    for l, _ in enumerate(fig_3d.data):
+    for l, _ in enumerate(fig.data):
         fig.data[l].marker.line.width = 0
 
     return fig

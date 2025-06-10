@@ -35,7 +35,10 @@ def umap(embeddings: pd.DataFrame, n_dim: int, densmap=False, n_neighbors=15, mi
                  n_neighbors=n_neighbors, 
                  min_dist=min_dist,
                  spread=spread)
-    reduced = model.fit_transform(embeddings)
+    reduced = pd.DataFrame(model.fit_transform(embeddings)).join(metadata)
 
-    return pd.DataFrame(reduced).join(metadata)
+    if n_dim < 4:
+        reduced.rename(columns={i: letter for i, letter in enumerate(["x", "y", "z"][:n_dim])}, inplace=True)
+
+    return reduced
     
