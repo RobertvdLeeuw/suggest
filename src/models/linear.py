@@ -22,12 +22,12 @@ class LinUCB(Model):
 
         self.alpha = alpha
 
-        self.exploration_matrix: np.ndarray
-        self.feature_coeffs: np.ndarray
+        self.exploration_matrix: np.ndarray  # A
+        self.feature_coeffs: np.ndarray  # b
 
     def _calc_song_values(self, embeddings: pd.DataFrame, songs_left: list[str]) -> dict[str, float]:
         explor_inv = np.linalg.inv(self.exploration_matrix)
-        coeff = explor_inv @ self.feature_coeffs
+        coeff = explor_inv @ self.feature_coeffs  # Theta
 
         # embeddings = embeddings[embeddings["name"].isin(songs_left)]  # Slower because pandas.
 
@@ -38,7 +38,8 @@ class LinUCB(Model):
         predicted_rewards = all_chunks @ coeff
         ucb_values = predicted_rewards + self.alpha * np.sqrt(uncertainty_terms)
 
-        return {name: np.mean(ucb_values[indices]) for name, indices in song_indices.items()}
+        return {name: np.mean(ucb_values[indices]) for name, indices in song_indices.items()
+                if name in songs_left}
 
     def train(self, embeddings: pd.DataFrame, metrics: list[Metric], T: int) -> Trajectory:
         assert T > 0
@@ -55,7 +56,6 @@ class LinUCB(Model):
         for t in range(T):
             [m.calc(TrainEvent.STEP_START, self.exploration_matrix, self.feature_coeffs, 
                     self.alpha, embeddings) for m in trajectory.metrics.values()]
-
 
             song_values = self._calc_song_values(embeddings, songs_left)
             picked = max(song_values, key=song_values.get)

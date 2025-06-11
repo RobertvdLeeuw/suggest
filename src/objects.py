@@ -20,6 +20,12 @@ class TrainEvent(Enum):  # Used to define when to calc what metric.
     # MODEL_UPDATED 
     # TRAINING_END 
 
+
+class MetricGroup(Enum):  # So we can group different metrics into same plot (e.g. expected values for different models).
+    EXPECTED_VALUE = 0
+    MODEL_PARAM_CHANGE = 1
+
+
 # @dataclass
 class Metric(ABC):
     name: str

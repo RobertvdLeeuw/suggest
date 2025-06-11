@@ -23,5 +23,5 @@ class SongsPicked(Metric):
     name = "Songs picked during trajectory."
     on_event = TrainEvent.STEP_END
 
-    def calc_inner(self, picked: int):
+    def calc_inner(self, picked: str):
         self.values.append(picked)

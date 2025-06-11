@@ -82,11 +82,12 @@ def filter_sparse_unliked(data: pd.DataFrame, frac: float) -> pd.DataFrame:
 
 
 def scatter_3d(embeddings: pd.DataFrame, reduced: pd.DataFrame, 
+               trust: float, cont: float,
                filter_rate: float = 0.3, opacity: float = 0.8):
     assert 0 <= filter_rate <= 1
     assert 0 <= opacity <= 1
 
-    trust, cont = trust_cont(embeddings, reduced)
+    # trust, cont = trust_cont(embeddings, reduced)
     reduced_sparse_umap = filter_sparse_unliked(reduced, filter_rate)
     
     reduced_sparse_umap["size"] = 10
