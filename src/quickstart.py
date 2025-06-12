@@ -122,16 +122,6 @@ def _(EMBEDDINGS, cont, mo, reduced_umap, trust, unliked_filter_rate):
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    timestep = mo.ui.slider(start=1, stop=999, step=1, value=1, label="Timestep")
-    classes = mo.ui.multiselect(options=["not", "near", "liked", "loved"],
-                                value=["not", "near", "liked", "loved"])
-
-    timestep, classes
-    return classes, timestep
-
-
-@app.cell(hide_code=True)
 def _(SongsPicked, classes, mo, px, reduced_umap, t, timestep):
     reduced_umap["picked"] = reduced_umap.name.apply(
         lambda x: x in t.metrics[SongsPicked.name].values[:timestep.value]
@@ -172,6 +162,16 @@ def _(SongsPicked, classes, mo, px, reduced_umap, t, timestep):
 
 
 @app.cell(hide_code=True)
+def _(mo):
+    timestep = mo.ui.slider(start=1, stop=999, step=1, value=1, label="Timestep")
+    classes = mo.ui.multiselect(options=["not", "near", "liked", "loved"],
+                                value=["not", "near", "liked", "loved"])
+
+    timestep, classes
+    return classes, timestep
+
+
+@app.cell(hide_code=True)
 def _(classes, mo, timestep, value_over_time):
     import plotly.graph_objects as go
     import plotly.express as px
@@ -208,7 +208,7 @@ def _(classes, mo, timestep, value_over_time):
     mo.ui.plotly(
         fig
     )
-    return (px,)
+    return current, px
 
 
 @app.cell(hide_code=True)
@@ -270,6 +270,7 @@ def _(df_pivoted, mo, prop_instead, px):
 @app.cell(hide_code=True)
 def _(SongValuesUCB, pd, reduced, t):
     import numpy as np
+    tmp = reduced[["song", "name"]].drop_duplicates()
 
     value_over_time = pd.DataFrame({
         "song": list(reduced.song.unique()) * t.T,
@@ -303,19 +304,24 @@ def _(mo, pd, px):
         data = json.load(f)
 
     genres_tags = [{"name": data[i]["name"],
+                    "isrc": data[i]["isrc"],
                     "genres": list(set(data[i]["genres"] +
                                        data[i]["tags"]))
                    } for i in range(len(data)) 
                      if "genres" in data[i]]    
 
-    genres_tags = [{"name": entry["name"],
+    genres_tags = [{"name": entry["name"].split('-')[-1].replace(".wav.csv", ""),
+                    "isrc": entry["isrc"],
                     "genre": genre}
                    for entry in genres_tags
-                   for genre in entry["genres"]]
+                   for genre in entry["genres"]
+                   if genre != "rock"]
 
     genres_tags = pd.DataFrame(genres_tags)
     genre_counts = genres_tags.genre.value_counts()
-    filtered_genres = genre_counts[genre_counts > 75]
+
+
+    filtered_genres = genre_counts[genre_counts > 10]
     mo.ui.plotly(
         px.bar(filtered_genres)
     )
@@ -323,6 +329,152 @@ def _(mo, pd, px):
     # TODO: Rock = anyof(psyrock, kraut, etc), jazz = anyof (jazz, lounge, etc)
     # THEN: piechart of custom agg genres,
     # THEN: All other genre-based plots.
+    return genre_counts, genres_tags
+
+
+@app.cell
+def _(genres_tags):
+    genres_tags
+    return
+
+
+@app.cell(hide_code=True)
+def _(genre_counts, genres_tags, mo, px):
+    from collections import defaultdict
+    genre_mappings = defaultdict(lambda: "Other", {
+        # Classic Rock
+        # "rock": "Classic Rock",
+        "classic rock": "Classic Rock", 
+        "hard rock": "Classic Rock",
+        "arena rock": "Classic Rock",
+        "rock and roll": "Classic Rock",
+        "blues rock": "Classic Rock",
+        "blues-rock": "Classic Rock",
+    
+        # Psychedelic Rock (kept separate)
+        "psychedelic rock": "Psychedelic Rock",
+        "psychedelic": "Psychedelic Rock",
+    
+        # Progressive/Art Rock
+        "progressive rock": "Progressive/Art Rock",
+        "art rock": "Progressive/Art Rock",
+        "symphonic rock": "Progressive/Art Rock",
+        "rock opera": "Progressive/Art Rock",
+        "progressive": "Progressive/Art Rock",
+        "progressive-rock": "Progressive/Art Rock",
+    
+        # Alternative/Indie Rock
+        "alternative rock": "Alternative/Indie Rock",
+        "indie rock": "Alternative/Indie Rock",
+        "post-punk": "Alternative/Indie Rock",
+        "punk": "Alternative/Indie Rock",
+        "punk rock": "Alternative/Indie Rock",
+        "proto-punk": "Alternative/Indie Rock",
+        "alternative punk": "Alternative/Indie Rock",
+    
+        # Hip Hop
+        "hip hop": "Hip Hop",
+        "hip-hop": "Hip Hop",
+        "gangsta rap": "Hip Hop",
+        "east coast hip hop": "Hip Hop",
+        "west coast hip hop": "Hip Hop",
+        "conscious hip hop": "Hip Hop",
+        "hardcore hip hop": "Hip Hop",
+        "jazz rap": "Hip Hop",
+        "pop rap": "Hip Hop",
+        "g-funk": "Hip Hop",
+        "alternative hip hop": "Hip Hop",
+        "boom bap": "Hip Hop",
+        "underground hip hop": "Hip Hop",
+    
+        # Electronic/Dance
+        "electronic": "Electronic/Dance",
+        "ambient": "Electronic/Dance",
+        "synth-pop": "Electronic/Dance",
+        "synthpop": "Electronic/Dance",
+        "synth pop": "Electronic/Dance",
+        "new wave": "Electronic/Dance",
+        "dance": "Electronic/Dance",
+        "downtempo": "Electronic/Dance",
+        "electro": "Electronic/Dance",
+        "trip hop": "Electronic/Dance",
+        "house": "Electronic/Dance",
+        "synthwave": "Electronic/Dance",
+        "dance-pop": "Electronic/Dance",
+        "alternative dance": "Electronic/Dance",
+        "indietronica": "Electronic/Dance",
+        "trance": "Electronic/Dance",
+        "electropop": "Electronic/Dance",
+        "dance-rock": "Electronic/Dance",
+        "techno": "Electronic/Dance",
+        "industrial": "Electronic/Dance",
+        "dub": "Electronic/Dance",
+        "synth funk": "Electronic/Dance",
+    
+        # Blues/Soul/R&B
+        "blues": "Blues/Soul/R&B",
+        "soul": "Blues/Soul/R&B",
+        "r&b": "Blues/Soul/R&B",
+        "funk": "Blues/Soul/R&B",
+        "british blues": "Blues/Soul/R&B",
+        "electric blues": "Blues/Soul/R&B",
+        "contemporary r&b": "Blues/Soul/R&B",
+        "pop soul": "Blues/Soul/R&B",
+        "soul jazz": "Blues/Soul/R&B",
+        "smooth soul": "Blues/Soul/R&B",
+        "chicago blues": "Blues/Soul/R&B",
+        "motown": "Blues/Soul/R&B",
+        "jazz-funk": "Blues/Soul/R&B",
+    
+        # Jazz
+        "jazz": "Jazz",
+        "vocal jazz": "Jazz",
+        "swing": "Jazz",
+        "big band": "Jazz",
+        "jazz fusion": "Jazz",
+    
+        # Pop
+        "pop": "Pop",
+        "pop rock": "Pop",
+        "pop/rock": "Pop",
+        "art pop": "Pop",
+        "psychedelic pop": "Pop",
+        "indie pop": "Pop",
+        "progressive pop": "Pop",
+        "soft rock": "Pop",
+        "easy listening": "Pop",
+        "ballad": "Pop",
+    
+        # Heavy/Metal
+        "heavy metal": "Heavy/Metal",
+        "metal": "Heavy/Metal",
+        "thrash metal": "Heavy/Metal",
+    
+        # Experimental (smaller category)
+        "experimental": "Experimental",
+        "experimental rock": "Experimental",
+        "avant-garde": "Experimental",
+        "krautrock": "Experimental",
+        "garage rock": "Experimental",
+        "stoner rock": "Experimental",
+        "space rock": "Experimental",
+        "acid rock": "Experimental",
+        "neo-psychedelia": "Experimental"})
+
+    genre_counts.index = genre_counts.index.map(genre_mappings)
+    genres_tags.genre = genres_tags.genre.apply(lambda g: genre_mappings[g])
+
+    mo.ui.plotly(px.bar(genre_counts, color=genre_counts.index))
+    return
+
+
+@app.cell
+def _(current, mo, px):
+    # genres_tags
+
+    mo.ui.plotly(
+        px.box(current, y="value", x="label", color="label")
+    )
     return
 
 
