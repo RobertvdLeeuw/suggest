@@ -122,6 +122,34 @@ def _(EMBEDDINGS, cont, mo, reduced_umap, trust, unliked_filter_rate):
 
 
 @app.cell(hide_code=True)
+def _(current, mo, px):
+    # genres_tags
+
+    mo.ui.plotly(
+        px.box(current, y="value", x="label", color="label")
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(SongValuesUCB, pd, reduced, t):
+    import numpy as np
+
+    value_over_time = pd.DataFrame({
+        "song": list(reduced.song.unique()) * t.T,
+        "value": [t.metrics[SongValuesUCB.name].values["Total"][step][song]
+                  for step in range(t.T) for song in reduced.song.unique()],
+        "label": [list(reduced[reduced.song == song].score)[0]
+                  for song in reduced.song.unique()] * t.T,
+        "t": [step for step in range(t.T) for _ in range(len(reduced.song.unique()))]
+    })
+
+    # value_over_time[(value_over_time.t == timestep.value)].value.describe()
+    # value_over_time.head()
+    return (value_over_time,)
+
+
+@app.cell(hide_code=True)
 def _(SongsPicked, classes, mo, px, reduced_umap, t, timestep):
     reduced_umap["picked"] = reduced_umap.name.apply(
         lambda x: x in t.metrics[SongsPicked.name].values[:timestep.value]
@@ -159,16 +187,6 @@ def _(SongsPicked, classes, mo, px, reduced_umap, t, timestep):
 
     mo.ui.plotly(fig3)
     return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    timestep = mo.ui.slider(start=1, stop=999, step=1, value=1, label="Timestep")
-    classes = mo.ui.multiselect(options=["not", "near", "liked", "loved"],
-                                value=["not", "near", "liked", "loved"])
-
-    timestep, classes
-    return classes, timestep
 
 
 @app.cell(hide_code=True)
@@ -268,49 +286,20 @@ def _(df_pivoted, mo, prop_instead, px):
 
 
 @app.cell(hide_code=True)
-def _(SongValuesUCB, pd, reduced, t):
-    import numpy as np
-    tmp = reduced[["song", "name"]].drop_duplicates()
-
-    value_over_time = pd.DataFrame({
-        "song": list(reduced.song.unique()) * t.T,
-        "value": [t.metrics[SongValuesUCB.name].values["Total"][step][song]
-                  for step in range(t.T) for song in reduced.song.unique()],
-        "label": [list(reduced[reduced.song == song].score)[0]
-                  for song in reduced.song.unique()] * t.T,
-        "t": [step for step in range(t.T) for _ in range(len(reduced.song.unique()))]
-    })
-
-    # value_over_time[(value_over_time.t == timestep.value)].value.describe()
-    # value_over_time.head()
-    return (value_over_time,)
-
-
-@app.cell(hide_code=True)
-def _(model, reduced):
-    values = model._calc_song_values(reduced, 
-                                     reduced[reduced.score.isin(["near", "not"])]["name"].unique())
-
-    for i in range(10):
-        best = max(values, key=values.get)
-        print(f"\t{i}  {values.pop(best):.3f} - {best.replace('.wav.csv', '')}")
-    return
-
-
-@app.cell
 def _(mo, pd, px):
-    import json
+    import json, re
+
     with open("../data/spotify_new.json", "r") as f:
         data = json.load(f)
 
-    genres_tags = [{"name": data[i]["name"],
+    genres_tags = [{"name": re.sub(r"'|\"|&|#|\[|\]|:|;", "", data[i]["name"]).strip(),
                     "isrc": data[i]["isrc"],
                     "genres": list(set(data[i]["genres"] +
                                        data[i]["tags"]))
                    } for i in range(len(data)) 
                      if "genres" in data[i]]    
 
-    genres_tags = [{"name": entry["name"].split('-')[-1].replace(".wav.csv", ""),
+    genres_tags = [{"name": entry["name"].split('-')[-1].replace(".wav.csv", "").strip(),
                     "isrc": entry["isrc"],
                     "genre": genre}
                    for entry in genres_tags
@@ -332,12 +321,6 @@ def _(mo, pd, px):
     return genre_counts, genres_tags
 
 
-@app.cell
-def _(genres_tags):
-    genres_tags
-    return
-
-
 @app.cell(hide_code=True)
 def _(genre_counts, genres_tags, mo, px):
     from collections import defaultdict
@@ -350,11 +333,11 @@ def _(genre_counts, genres_tags, mo, px):
         "rock and roll": "Classic Rock",
         "blues rock": "Classic Rock",
         "blues-rock": "Classic Rock",
-    
+
         # Psychedelic Rock (kept separate)
         "psychedelic rock": "Psychedelic Rock",
         "psychedelic": "Psychedelic Rock",
-    
+
         # Progressive/Art Rock
         "progressive rock": "Progressive/Art Rock",
         "art rock": "Progressive/Art Rock",
@@ -362,7 +345,7 @@ def _(genre_counts, genres_tags, mo, px):
         "rock opera": "Progressive/Art Rock",
         "progressive": "Progressive/Art Rock",
         "progressive-rock": "Progressive/Art Rock",
-    
+
         # Alternative/Indie Rock
         "alternative rock": "Alternative/Indie Rock",
         "indie rock": "Alternative/Indie Rock",
@@ -371,7 +354,7 @@ def _(genre_counts, genres_tags, mo, px):
         "punk rock": "Alternative/Indie Rock",
         "proto-punk": "Alternative/Indie Rock",
         "alternative punk": "Alternative/Indie Rock",
-    
+
         # Hip Hop
         "hip hop": "Hip Hop",
         "hip-hop": "Hip Hop",
@@ -386,7 +369,7 @@ def _(genre_counts, genres_tags, mo, px):
         "alternative hip hop": "Hip Hop",
         "boom bap": "Hip Hop",
         "underground hip hop": "Hip Hop",
-    
+
         # Electronic/Dance
         "electronic": "Electronic/Dance",
         "ambient": "Electronic/Dance",
@@ -410,7 +393,7 @@ def _(genre_counts, genres_tags, mo, px):
         "industrial": "Electronic/Dance",
         "dub": "Electronic/Dance",
         "synth funk": "Electronic/Dance",
-    
+
         # Blues/Soul/R&B
         "blues": "Blues/Soul/R&B",
         "soul": "Blues/Soul/R&B",
@@ -425,14 +408,14 @@ def _(genre_counts, genres_tags, mo, px):
         "chicago blues": "Blues/Soul/R&B",
         "motown": "Blues/Soul/R&B",
         "jazz-funk": "Blues/Soul/R&B",
-    
+
         # Jazz
         "jazz": "Jazz",
         "vocal jazz": "Jazz",
         "swing": "Jazz",
         "big band": "Jazz",
         "jazz fusion": "Jazz",
-    
+
         # Pop
         "pop": "Pop",
         "pop rock": "Pop",
@@ -444,12 +427,12 @@ def _(genre_counts, genres_tags, mo, px):
         "soft rock": "Pop",
         "easy listening": "Pop",
         "ballad": "Pop",
-    
+
         # Heavy/Metal
         "heavy metal": "Heavy/Metal",
         "metal": "Heavy/Metal",
         "thrash metal": "Heavy/Metal",
-    
+
         # Experimental (smaller category)
         "experimental": "Experimental",
         "experimental rock": "Experimental",
@@ -469,12 +452,54 @@ def _(genre_counts, genres_tags, mo, px):
 
 
 @app.cell
-def _(current, mo, px):
-    # genres_tags
+def _(genres_tags, pd, timestep, value_over_time):
+    song_to_genres = {k: list(set(v)) for k, v in genres_tags.groupby('name')['genre'].apply(list).to_dict().items()}
 
+    # Expand the original dataframe
+    total = len(value_over_time.index)
+    expanded_rows = []
+    for h, row in value_over_time[value_over_time.t == timestep.value].iterrows():
+        print(f"{h/total*100:.1f}%", end="\r")
+        song = row['song']
+
+        for genre in song_to_genres.get(song, []):
+            new_row = row.copy()
+            new_row['genre'] = genre
+            expanded_rows.append(new_row)
+
+    # sum(int(row['song'] in song_to_genres) for _, row in value_over_time.iterrows()) / len(value_over_time.index)*100
+    tmp = pd.DataFrame(expanded_rows)
+    return
+
+
+app._unparsable_cell(
+    r"""
     mo.ui.plotly(
-        px.box(current, y="value", x="label", color="label")
+        px.box(tmp[\"value\", \"genre\"]], y=\"value\", x=\"genre\", color=\"genre\")
     )
+    """,
+    name="_"
+)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    timestep = mo.ui.slider(start=1, stop=999, step=1, value=1, label="Timestep")
+    classes = mo.ui.multiselect(options=["not", "near", "liked", "loved"],
+                                value=["not", "near", "liked", "loved"])
+
+    timestep, classes
+    return classes, timestep
+
+
+@app.cell(hide_code=True)
+def _(model, reduced):
+    values = model._calc_song_values(reduced, 
+                                     reduced[reduced.score.isin(["near", "not"])]["name"].unique())
+
+    for i in range(100):
+        best = max(values, key=values.get)
+        print(f"\t{i}  {values.pop(best):.3f} - {best.replace('.wav.csv', '')}")
     return
 
 

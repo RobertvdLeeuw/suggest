@@ -1,6 +1,7 @@
 # Project specific
 data/
 
+spotify_data_isrc.json
 
 # General
 .direnv/
