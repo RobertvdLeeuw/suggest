@@ -1,5 +1,8 @@
 # Project specific
-data/
+data/embeddings/
+data/enriched.csv
+data/songs/
+data/spotify.json
 
 spotify_data_isrc.json
 
