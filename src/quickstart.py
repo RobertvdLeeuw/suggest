@@ -4,6 +4,32 @@ __generated_with = "0.13.15"
 app = marimo.App(width="full")
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+    # Data Visualization Exercise
+
+    With the permission of my teacher, I used this exercise as an opportunity to visualize model performance for my data challenge. The short explanation is that I created a music recommender using embeddings and linUCB for psyrock. The training dataset is a collection on all my music on spotify with 4 categories: 'not' (completley different genre), 'near' (from psyrock artist but songs I don't like i particular), 'liked' (liked psyrock), and 'loved' (subset of liked that is most representational of my taste). It converges nicely to my taste already, but I want a deeper look into the exploration behavior.
+
+    **Quick note**: this notebook was made in Marimo, allowing for more interactivity. If you want the full experience you should run marimo using this notebook in the [project repository](https://github.com/RobertvdLeeuw/suggest), that also contains a 100Mb example of the full (1.4Gb) dataset.
+    """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+    ## Setup
+
+    First things first, embeddings have to be loaded and reduced, and the model has to be ran.
+    """
+    )
+    return
+
+
 @app.cell
 def _():
     import marimo as mo
@@ -23,7 +49,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(LinUCB, reduced):
-    model = LinUCB(n_dim=250, alpha=1, feature_start=-1)
+    model = LinUCB(n_dim=250, alpha=3, feature_start=-1)
 
     from metrics.general import GoodSongsLeft, SongsPicked
     from metrics.linear import SongValuesUCB, CoefficientChange
@@ -33,37 +59,26 @@ def _(LinUCB, reduced):
                                       CoefficientChange,
                                       SongsPicked], 
                     T=1000)
-    return (
-        CoefficientChange,
-        GoodSongsLeft,
-        SongValuesUCB,
-        SongsPicked,
-        model,
-        t,
-    )
+    return CoefficientChange, GoodSongsLeft, SongValuesUCB, SongsPicked, t
 
 
 @app.cell(hide_code=True)
-def _(CoefficientChange, GoodSongsLeft, LinUCB, SongValuesUCB, reduced):
-    t2 = LinUCB(n_dim=250, alpha=3, feature_start=-1).train(reduced, 
-                                                            metrics=[SongValuesUCB, 
-                                                                     GoodSongsLeft, 
-                                                                     CoefficientChange], 
-                                                            T=1000)
-    return (t2,)
-
-
-@app.cell(hide_code=True)
-def _(CoefficientChange, GoodSongsLeft, SongValuesUCB, mo, t, t2):
+def _(CoefficientChange, GoodSongsLeft, SongValuesUCB, mo, t):
     from plots import plot_all
-    fig2 = plot_all([t, t2], [GoodSongsLeft(), 
-                              CoefficientChange(), 
-                              SongValuesUCB(agg_how="mean")])
+    fig2 = plot_all([t], [GoodSongsLeft(), 
+                          CoefficientChange(), 
+                          SongValuesUCB(agg_how="mean")])
     # fig2.add_vline(x=timestep.value)
 
     mo.ui.plotly(
         fig2
     )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""These are my previous visuals. As stated previously, the model is indeed recommending a lot of the good songs in the dataset, but these don't help me understand the exploratory side all too much.""")
     return
 
 
@@ -83,52 +98,25 @@ def _(EMBEDDINGS):
 
 @app.cell(hide_code=True)
 def _(mo):
-    unliked_filter_rate = mo.ui.slider(start=0, stop=0.95, step=0.05, value=0.7, label="Unliked filter rate")
-    unliked_filter_rate
-    return (unliked_filter_rate,)
-
-
-@app.cell(hide_code=True)
-def _(mo, px, reduced_umap, unliked_filter_rate):
-    #from metrics.reduce import trust_cont
-    from plots import filter_sparse_unliked
-
-    reduced_sparse_umap = filter_sparse_unliked(reduced_umap, 1-unliked_filter_rate.value)
-
-    distribution = reduced_sparse_umap.score.value_counts()
-
-    mo.ui.plotly(
-      px.pie(values=distribution, 
-             names=distribution.index,
-             color=distribution.index,
-             color_discrete_map={'not':'red',
-                                 'near':'orange',
-                                 'liked':'green',
-                                 'loved':'darkgreen'},
-             title='Score Distribution')
+    mo.md(
+        r"""
+    # Timestep Based Visuals
+    To get a better understanding of the exploration, I designed the following plots.
+    The first is a UMAP reduction of my space, showing only only songs recommended before or at timestep $t$. This allows me to see where in the space the model is picking from, which is particularly useful in early timsteps.
+    """
     )
     return
 
 
 @app.cell(hide_code=True)
-def _(EMBEDDINGS, cont, mo, reduced_umap, trust, unliked_filter_rate):
-    from plots import scatter_3d
-    mo.ui.plotly(scatter_3d(EMBEDDINGS, 
-                            reduced_umap,
-                            trust, cont,
-                            filter_rate=1-unliked_filter_rate.value,
-                            opacity=0.7))
-    return
+def _(mo):
+    timestep = mo.ui.slider(start=1, stop=999, step=1, value=1, label="Timestep")
+    classes = mo.ui.multiselect(options=["not", "near", "liked", "loved"],
+                                value=["not", "near", "liked", "loved"])
 
 
-@app.cell(hide_code=True)
-def _(current, mo, px):
-    # genres_tags
-
-    mo.ui.plotly(
-        px.box(current, y="value", x="label", color="label")
-    )
-    return
+    timestep, classes
+    return classes, timestep
 
 
 @app.cell(hide_code=True)
@@ -146,11 +134,11 @@ def _(SongValuesUCB, pd, reduced, t):
 
     # value_over_time[(value_over_time.t == timestep.value)].value.describe()
     # value_over_time.head()
-    return (value_over_time,)
+    return np, value_over_time
 
 
 @app.cell(hide_code=True)
-def _(SongsPicked, classes, mo, px, reduced_umap, t, timestep):
+def _(SongsPicked, classes, cont, mo, px, reduced_umap, t, timestep, trust):
     reduced_umap["picked"] = reduced_umap.name.apply(
         lambda x: x in t.metrics[SongsPicked.name].values[:timestep.value]
     )
@@ -168,7 +156,7 @@ def _(SongsPicked, classes, mo, px, reduced_umap, t, timestep):
                                              'liked':'green',
                                              'loved':'darkgreen'},
                          title=f"Songs Recommended at Timestep {timestep.value}",
-                         #subtitle=f"Trustworthiness: {trust:.3f}, Continuity: {cont:.3f}",
+                         subtitle=f"Reduction trustworthiness: {trust:.3f}, continuity: {cont:.3f}",
                          hover_data={"x": False, 
                                      "y": False, 
                                      "z": False,  
@@ -186,6 +174,12 @@ def _(SongsPicked, classes, mo, px, reduced_umap, t, timestep):
         fig3.data[l].marker.line.width = 0
 
     mo.ui.plotly(fig3)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""Below is a histogram of predicted values of *all* songs at timestep $t$. I believe most value comes from this plot when inspecting the overlap of not/near into liked/loved. Without inspecting individual picks, I would presume 'exploratory moves' are sourced from there, and I should be able to influence this overlap with different hyperparams and reward functions. Note that in the earliest timesteps the values are all over the place and they need a couple steps to fall within the usual range.""")
     return
 
 
@@ -226,62 +220,30 @@ def _(classes, mo, timestep, value_over_time):
     mo.ui.plotly(
         fig
     )
-    return current, px
+    return (px,)
 
 
 @app.cell(hide_code=True)
-def _(SongsPicked, mo, pd, reduced, t):
-    prop_instead = mo.ui.switch(value=False, label="Show proportional instead")
-
-
-    pick_distribution_at_t = [reduced[reduced["name"] == song].score.iloc[0] 
-                              for song in t.metrics[SongsPicked.name].values]
-
-    def create_pivoted_proportions(scores):
-        df = pd.DataFrame({'score': scores, 'timestep': range(1, len(scores) + 1)})
-
-        # Create running proportions
-        running_data = []
-        for category in ['not', 'near', 'liked', 'loved']:
-            running_counts = (df['score'] == category).cumsum()
-            running_props = running_counts / df['timestep']
-
-            for t in range(len(scores)):
-                running_data.append({
-                    'timestep': t + 1,
-                    'type': category,
-                    'class count': running_counts.iloc[t],
-                    'proportional total': running_props.iloc[t]
-                })
-
-        result_df = pd.DataFrame(running_data)
-        return result_df
-
-    # Usage
-    df_pivoted = create_pivoted_proportions(pick_distribution_at_t)
-
-
-    prop_instead
-    return df_pivoted, prop_instead
+def _(mo):
+    mo.md(
+        r"""
+    # Data Enrichment: Genres
+    These plots and the songs in them make sense to *me* because it's my music, but to get across the (exploring) performance more I need genres to classify by. I enriched my dataset with genres from the MusicBrainz API. Unfortunely, these are community driven, meaning low coherence and coverage. About 40% of my embedded songs are tagged, but that should be enough to get *some* insights. Plus, I can easily swap out the genre datasource later down the line. 
+    """
+    )
+    return
 
 
 @app.cell(hide_code=True)
-def _(df_pivoted, mo, prop_instead, px):
-    from itertools import accumulate
+def _(mo):
+    mo.md(
+        r"""
+    ## Preparation
+    Below are the counts of genre's we will consider (there were many more with <9 occurences). 'Rock' will be removed because it's too wide.vague of a descriptor considering the other niches listed. This is still too many genres for meaningful comparison, so I created a manual aggregation of these genres. 
 
-    #df_pivoted
-    mo.ui.plotly(
-        px.bar(df_pivoted, x="timestep", 
-               y="proportional total" if prop_instead.value else "class count", 
-               color="type",
-               hover_data={"timestep": True, 
-                           "proportional total": False, 
-                           "class count": True},
-               color_discrete_map={'not':'red',
-                                   'near':'orange',
-                                   'liked':'green',
-                                   'loved':'darkgreen'})
-    )  # TOTO: Overlay plot of total counts.
+    Another quirk in the data is that songs usually are tagged with multiple genres. I didn't want to simply pick one from these, so any score or picked status tied to a songs will count as 1 occurence for each of its genres. For the short term this seems like a better representation.
+    """
+    )
     return
 
 
@@ -447,19 +409,32 @@ def _(genre_counts, genres_tags, mo, px):
     genre_counts.index = genre_counts.index.map(genre_mappings)
     genres_tags.genre = genres_tags.genre.apply(lambda g: genre_mappings[g])
 
-    mo.ui.plotly(px.bar(genre_counts, color=genre_counts.index))
+    mo.ui.plotly(px.bar(genre_counts, 
+                        color=genre_counts.index,
+                        title="Aggregated genre counts"))
+    return (genre_mappings,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+    ## Analysis
+
+    Now, with the same timestep, we can analyze overall genre visuals during training.
+    The second plot is more detailed (histograms instead of boxplots), which would still to unreadable with this amount of genres, hence the dropdown selection. (Note: the second plot is with matplotlib because the plotly implementation was too slow).
+    """
+    )
     return
 
 
-@app.cell
-def _(genres_tags, pd, timestep, value_over_time):
+@app.cell(hide_code=True)
+def _(genres_tags, mo, pd, px, timestep, value_over_time):
     song_to_genres = {k: list(set(v)) for k, v in genres_tags.groupby('name')['genre'].apply(list).to_dict().items()}
 
     # Expand the original dataframe
-    total = len(value_over_time.index)
     expanded_rows = []
     for h, row in value_over_time[value_over_time.t == timestep.value].iterrows():
-        print(f"{h/total*100:.1f}%", end="\r")
         song = row['song']
 
         for genre in song_to_genres.get(song, []):
@@ -467,39 +442,105 @@ def _(genres_tags, pd, timestep, value_over_time):
             new_row['genre'] = genre
             expanded_rows.append(new_row)
 
-    # sum(int(row['song'] in song_to_genres) for _, row in value_over_time.iterrows()) / len(value_over_time.index)*100
-    tmp = pd.DataFrame(expanded_rows)
-    return
-
-
-app._unparsable_cell(
-    r"""
     mo.ui.plotly(
-        px.box(tmp[\"value\", \"genre\"]], y=\"value\", x=\"genre\", color=\"genre\")
+        px.box(pd.DataFrame(expanded_rows)[["value", "genre"]], y="value", x="genre", color="genre")
     )
-    """,
-    name="_"
-)
+    return (song_to_genres,)
+
+
+@app.cell
+def _(genre_mappings, mo, timestep):
+    genres = mo.ui.multiselect(options=set(genre_mappings.values()),
+                                value=[])
+    timestep, genres
+    return (genres,)
+
+
+@app.cell(hide_code=True)
+def _(SongsPicked, genres, np, pd, song_to_genres, t):
+    if genres.value:
+        t_genres = [song_to_genres.get(song.split('- ')[-1].replace(".wav.csv", ""), ["Other"])
+        for song in t.metrics[SongsPicked.name].values]
+
+        from sklearn.preprocessing import MultiLabelBinarizer
+
+        # Create the binary matrix
+        mlb = MultiLabelBinarizer()
+        genre_matrix = mlb.fit_transform(t_genres)
+
+        import matplotlib.pyplot as plt
+
+        # Create DataFrame with proper column names
+        genre_df = pd.DataFrame(
+            genre_matrix,
+            columns=mlb.classes_,
+            index=range(len(t_genres))
+        )
+
+        genre_df.reset_index(inplace=True)
+        genre_df.rename(columns={'index': 't'}, inplace=True)
+
+        from plots import moving_average
+        def plotthis():
+            all_genres = genres.value
+
+            # Create binary matrix
+            binary_data = []
+            for t, genres_at_t in enumerate(t_genres):
+                row = {'t': t}
+                for genre in all_genres:
+                    row[genre] = 1.0 if genre in genres_at_t else 0.0
+                binary_data.append(row)
+
+            genre_df = pd.DataFrame(binary_data).astype(float)
+
+
+            # Create matplotlib figure
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            # Method 1: Fully overlaid bars
+            mov_avg = 25
+            x = pd.Series(genre_df['t'])[:-(mov_avg-1)]
+            width = 0.8  # Width of bars
+
+            colors = plt.cm.Set3(np.linspace(0, 1, len(all_genres)))  # Generate distinct colors
+
+            for i, genre in enumerate(reversed(all_genres)):
+                # print(genre_df[genre])
+                y = moving_average(list(genre_df[genre]), n=mov_avg)
+                ax.bar(x, y, width=width, alpha=0.7, label=genre, color=colors[i])
+
+            ax.set_xlabel('Timestep (t)', fontsize=12)
+            ax.set_ylabel('Genre Present (1=Yes, 0=No)', fontsize=12)
+            ax.set_title('Genre Presence Over Time', fontsize=14, fontweight='bold')
+            ax.set_ylim(-0.1, 1.1)
+            ax.set_yticks([0, 1])
+            ax.set_xticks(range(len(t_genres)))
+            ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+            ax.grid(True, alpha=0.3, axis='y')
+
+            plt.tight_layout()
+            plt.show()
+        plotthis()
+    else:
+        print("Pick genre(s) from the dropdown above.")
+    return
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    timestep = mo.ui.slider(start=1, stop=999, step=1, value=1, label="Timestep")
-    classes = mo.ui.multiselect(options=["not", "near", "liked", "loved"],
-                                value=["not", "near", "liked", "loved"])
-
-    timestep, classes
-    return classes, timestep
+    mo.md(r"""This plot would be better if the genres were equally distributed, but that's not worth the effort with the lowe coverage of the genres. That said, it's still great to be able to see genre exploration over time!""")
+    return
 
 
 @app.cell(hide_code=True)
-def _(model, reduced):
-    values = model._calc_song_values(reduced, 
-                                     reduced[reduced.score.isin(["near", "not"])]["name"].unique())
-
-    for i in range(100):
-        best = max(values, key=values.get)
-        print(f"\t{i}  {values.pop(best):.3f} - {best.replace('.wav.csv', '')}")
+def _(mo):
+    mo.md(
+        r"""
+    # Conclusion: 
+    I'm happy with how these plots ended up, and I already started using them for model performance exploration - proving to me I've visualized actually useful info. The code in this notebook isn't the cleanest but I'm in the middle of rewriting the metric tracking system anyway so all these plot will be redone soon.
+    """
+    )
     return
 
 
