@@ -29,7 +29,7 @@ def plot_all(trajectories: list[Trajectory], metrics: list[Metric] = [], moving_
     missing = [f"{t.model_name}: {m.name}" for m in metrics for t in trajectories if m.name not in t.metrics]
     assert missing == [], f"Required metric(s) missing for some trajectories:\n\t{'\n\t'.join(missing)}"
 
-    assert len(trajectories) < 4, "That'll look like an epileptic attack, retard. Back to the drawing board with you!"
+    # assert len(trajectories) < 4, "That'll look like an epileptic attack, retard. Back to the drawing board with you!"
 
     fig = make_subplots(
         rows=len(metrics), 
@@ -39,7 +39,7 @@ def plot_all(trajectories: list[Trajectory], metrics: list[Metric] = [], moving_
         shared_xaxes=True,
         # specs=[[{"secondary_y": False} for _ in range(len(histories))] for _ in range(2)]
     )
-    fig['layout'].update(height=300*len(metrics))
+    fig['layout'].update(height=700*len(metrics))
 
     for i, m in enumerate(metrics, start=1):
         for j, (t, col) in enumerate(zip(trajectories, COLORS)):
@@ -60,9 +60,9 @@ def plot_all(trajectories: list[Trajectory], metrics: list[Metric] = [], moving_
                     go.Scatter(
                         x=list(range(len(component_values) - moving_avg + 1)),
                         y=moving_average(component_values, moving_avg),
-                        name=component_name,
+                        name=t.model_name,
                         legendgroup=t.model_name,
-                        showlegend= i == 1,  # Only when multiple components and on first model.
+                        showlegend=True,  # Only when multiple components and on first model.
                         line={"width": 2, "color": col, "dash": line_style}
                     ),
                     row=i, col=1
@@ -70,7 +70,12 @@ def plot_all(trajectories: list[Trajectory], metrics: list[Metric] = [], moving_
     fig.update_xaxes(title_text="Steps", row=len(metrics), col=1)
     fig.update_layout(
         title_text=f'Model Performance (moving avg of {moving_avg})',
-        showlegend=True
+        showlegend=True,
+        legend = {
+            "orientation": "h",
+            "x": 1, "xanchor": "right",
+            "y": 1.02, "yanchor": "bottom",
+        }
     )
 
     return fig
@@ -119,3 +124,22 @@ def scatter_3d(embeddings: pd.DataFrame, reduced: pd.DataFrame,
         fig.data[l].marker.line.width = 0
 
     return fig
+
+value_fig = {}
+def set_value_fig(fig):
+    global value_fig
+    
+    value_fig = fig
+
+def get_value_fig():
+    return value_fig
+
+
+t=0
+def set_t(t_new):
+    global t
+    
+    t = t_new
+
+def get_t():
+    return t
