@@ -1,0 +1,41 @@
+services:
+  postgres:
+    build:
+      context: ./db
+      dockerfile: Dockerfile
+    container_name: postgres-vector
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test 
+      POSTGRES_DB: vectordb
+      # Optional: Customize PostgreSQL config
+      # POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/db/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  # Add your other services here (e.g., your application)
+  # app:
+  #   image: your-app-image
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   # ...
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local  # Persistent
