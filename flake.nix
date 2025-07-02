@@ -61,48 +61,70 @@
           buildInputs = (old.buildInputs or []) ++ [ pkgs.tbb_2022_0 ];
         });
 
-        "tensorflow-rocm" = _prev."tensorflow-rocm".overrideAttrs (old: {
-          buildInputs = (old.buildInputs or []) ++ [ 
-            pkgs.stdenv.cc.cc.lib 
-            pkgs.glibc 
-
-            # ROCm libraries
-            pkgs.rocmPackages.llvm.llvm
-            pkgs.rocmPackages.hipcc
-            pkgs.rocmPackages.hipify
-            pkgs.rocmPackages.hiprand
-            pkgs.rocmPackages.hipblaslt
-            pkgs.rocmPackages.hip-common
-            pkgs.rocmPackages.hipblas-common
-            pkgs.rocmPackages.rpp-hip
-
-            pkgs.rocmPackages.hipblas
-            pkgs.rocmPackages.hipfft
-            pkgs.rocmPackages.hipsolver
-            pkgs.rocmPackages.hipsparse
-            pkgs.rocmPackages.rpp
-            pkgs.rocmPackages.rocblas
-            pkgs.rocmPackages.clr
-            pkgs.rocmPackages.hipcub
-            pkgs.rocmPackages.miopen
-            pkgs.rocmPackages.rocm-smi
-            pkgs.rocmPackages.rccl
-            pkgs.rocmPackages.rocthrust
-
-            pkgs.libzip
-            pkgs.libz
-            pkgs.zlib
-            pkgs.zlib-ng
-            # pythonPkgs.zlib-ng
-            pkgs.zstd
-
-            pkgs.xz
-            # pythonPkgs.pylzma
-
-            pkgs.cmake
-            pkgs.ninja
-          ];
+        jukemirlib = _prev.jukemirlib.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
+            _final.resolveBuildSystem { setuptools = []; };
         });
+        fire = _prev.fire.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
+            _final.resolveBuildSystem { setuptools = []; };
+        });
+        jukebox = _prev.jukebox.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
+            _final.resolveBuildSystem { setuptools = []; };
+        });
+        wget = _prev.wget.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
+            _final.resolveBuildSystem { setuptools = []; };
+        });
+        jaconv = _prev.jaconv.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
+            _final.resolveBuildSystem { setuptools = []; };
+        });
+
+
+        # "tensorflow-rocm" = _prev."tensorflow-rocm".overrideAttrs (old: {
+        #   buildInputs = (old.buildInputs or []) ++ [ 
+        #     pkgs.stdenv.cc.cc.lib 
+        #     pkgs.glibc 
+
+        #     # ROCm libraries
+        #     pkgs.rocmPackages.llvm.llvm
+        #     pkgs.rocmPackages.hipcc
+        #     pkgs.rocmPackages.hipify
+        #     pkgs.rocmPackages.hiprand
+        #     pkgs.rocmPackages.hipblaslt
+        #     pkgs.rocmPackages.hip-common
+        #     pkgs.rocmPackages.hipblas-common
+        #     pkgs.rocmPackages.rpp-hip
+
+        #     pkgs.rocmPackages.hipblas
+        #     pkgs.rocmPackages.hipfft
+        #     pkgs.rocmPackages.hipsolver
+        #     pkgs.rocmPackages.hipsparse
+        #     pkgs.rocmPackages.rpp
+        #     pkgs.rocmPackages.rocblas
+        #     pkgs.rocmPackages.clr
+        #     pkgs.rocmPackages.hipcub
+        #     pkgs.rocmPackages.miopen
+        #     pkgs.rocmPackages.rocm-smi
+        #     pkgs.rocmPackages.rccl
+        #     pkgs.rocmPackages.rocthrust
+
+        #     pkgs.libzip
+        #     pkgs.libz
+        #     pkgs.zlib
+        #     pkgs.zlib-ng
+        #     # pythonPkgs.zlib-ng
+        #     pkgs.zstd
+
+        #     pkgs.xz
+        #     # pythonPkgs.pylzma
+
+        #     pkgs.cmake
+        #     pkgs.ninja
+        #   ];
+        # });
       };
 
       # This example is only using x86_64-linux
@@ -138,6 +160,7 @@
         pkgs.rocmPackages.miopen
         pkgs.rocmPackages.rccl
         pkgs.stdenv.cc.cc.lib
+        pkgs.libsndfile
       ];
 
     in
@@ -158,6 +181,9 @@
             packages = [
               python
               pkgs.uv
+
+              pkgs.spotdl
+              pkgs.libsndfile
               
               pkgs.rocmPackages.rocm-smi
               pkgs.rocmPackages.rocm-runtime
