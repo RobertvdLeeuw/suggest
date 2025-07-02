@@ -49,7 +49,7 @@ def _():
 
 
 @app.cell
-def _(LinUCB, T, mo, reduced):
+def _(LinUCB, T, mo, reduced, t_ts):
     from plots import plot_all
     from random import choices
     from objects import Trajectory
@@ -60,7 +60,7 @@ def _(LinUCB, T, mo, reduced):
                    feature_start=-1)
 
     from metrics.general import GoodSongsLeft, SongsPicked
-    from metrics.linear import SongValuesUCB, CoefficientChange
+    from metrics.linear import SongValuesUCB, CoefficientChange, SongValuesTS
 
     t = model.train(reduced, metrics=[GoodSongsLeft], 
                     T=T)
@@ -86,7 +86,7 @@ def _(LinUCB, T, mo, reduced):
                    update_step=25, 
                    feature_start=-1, 
                    epsilon=0.45).train(reduced, metrics=[GoodSongsLeft], T=T)
-    fig4 = plot_all([t_random, t_eps, t], [GoodSongsLeft()])
+    fig4 = plot_all([t_random, t_ts, t], [GoodSongsLeft()])
 
     mo.ui.plotly(
         fig4
