@@ -14,7 +14,7 @@ def embed(file_path: str) -> np.array:
     embeddings = []
     for offset in range(0, len(audio)/SAMPLE_RATE, SEGMENT_LENGTH - SEGMENT_OVERLAP):  # Seconds
         offset_sr = offset * SAMPLE_RATE
-        audio_chunk = AudioArray(a=audio.a[offset_sr:offset_sr+SEGMENT_LENGTH *SAMPLE_RATE],
+        audio_chunk = AudioArray(a=audio.a[offset_sr:offset_sr + SEGMENT_LENGTH*SAMPLE_RATE],
                                  sr=SAMPLE_RATE)
 
         emb = AudioEmbedding(return_tensors="pt")(audio_chunk)
