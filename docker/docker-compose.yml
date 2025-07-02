@@ -3,7 +3,7 @@ services:
     build:
       context: ./db
       dockerfile: Dockerfile
-    container_name: postgres-vector
+    container_name: postgres-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: test 
@@ -24,13 +24,30 @@ services:
     networks:
       - app_network
 
-  # Add your other services here (e.g., your application)
-  # app:
-  #   image: your-app-image
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   # ...
+  embedder:
+    build:
+      context: ./embed
+      dockerfile: Dockerfile
+    container_name: python-embedder
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: test
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: vectordb
+      # Set this to "1" to enable development mode
+      DEVELOPMENT_MODE: "1"
+    volumes:
+      - ./app:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Alternative development command that uses uv directly
+    # Uncomment for development mode with hot reloading
+    # command: sh -c "uv pip install --system -e . && python main.py"
+    networks:
+      - app_network
+
 
 networks:
   app_network:

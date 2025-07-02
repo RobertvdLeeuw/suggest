@@ -71,7 +71,7 @@ _SPOTDL = Spotdl(no_cache=True,
                  output_format="wav",
                  output_directory=DOWNLOAD_LOC)
 
-async def download(spotify_url: str):
+async def _download(spotify_url: str):
     song = _SPOTDL.search(["https://open.spotify.com/track/your_track_id"])
     
     # Figure out object, then some type of no-match check.
@@ -83,7 +83,7 @@ async def download(spotify_url: str):
     except:
         pass
 
-async def download_loop():
+async def _download_loop():
     while True:
         for q in [_JUKEMIR_QUEUE, _AUDITUS_QUEUE]:
             if q.qsize() > 5:
@@ -94,8 +94,8 @@ async def download_loop():
         await asyncio.sleep(1)
 
     
-def _clean_downloads():  # This this like every hour
-    for file in os.listdir(DOWNLOAD_LOC):
+def _clean_downloads():
+    for file in os.listdir(_DOWNLOAD_LOC):
         if file not in _AUDITUS_QUEUE and file not in _JUKEMIR_QUEUE:
             os.remove(file)
 
@@ -108,7 +108,7 @@ async def main():
         scheduler.add_job(clean_downloads, 'interval', hours=1)
         scheduler.start()
         
-        await download_loop(jukemir_queue, auditus_queue)
+        await _download_loop(jukemir_queue, auditus_queue)
     
 
 if __name__ == "__main__":
