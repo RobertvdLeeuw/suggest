@@ -9,6 +9,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "apscheduler>=3.11.0",
     "auditus>=0.0.6",
     "ipympl>=0.9.7",
     "jukemirlib",
