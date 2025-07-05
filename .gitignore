@@ -3,6 +3,7 @@ data/embeddings/
 data/enriched.csv
 data/songs/
 data/spotify.json
+downloads/
 
 spotify_data_isrc.json
 

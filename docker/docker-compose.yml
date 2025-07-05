@@ -27,13 +27,15 @@ services:
   embedder:
     build:
       context: ..
-      dockerfile: docker/embed/Dockerfile
-    container_name: python-embedder
+      dockerfile: docker/collection/Dockerfile
+    container_name: song-collector
     environment:
       DB_USER: postgres
       DB_PASSWORD: test
       SPOTIFY_ID: "a766651ba4b744ed82f1e520a75b2455"
       SPOTIFY_SECRET: "767732da0b064b838ebe5d0e3f6ce4eb"
+      LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/usr/lib:/lib"
+
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: vectordb

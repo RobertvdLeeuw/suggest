@@ -6,6 +6,7 @@ CREATE TYPE metadata_enum AS ENUM ('tag', 'genre');
 -- Tables
 CREATE TABLE IF NOT EXISTS Songs (
     song_id serial PRIMARY KEY,
+    spotify_id varchar(255) UNIQUE NOT NULL,
     song_name varchar(255) NOT NULL,
     album varchar(255) NOT NULL,
     spotify_url varchar(512) UNIQUE NOT NULL
@@ -13,6 +14,7 @@ CREATE TABLE IF NOT EXISTS Songs (
 
 CREATE TABLE IF NOT EXISTS Artists (
     artist_id serial PRIMARY KEY,
+    spotify_id varchar(255) UNIQUE NOT NULL,
     artist_name varchar(255) UNIQUE NOT NULL
 );
 
@@ -22,7 +24,14 @@ CREATE TABLE IF NOT EXISTS Song_Artist (
     PRIMARY KEY (song_id, artist_id)
 );
 
-CREATE TABLE IF NOT EXISTS Metadata (
+CREATE TABLE IF NOT EXISTS Artist_Metadata (
+    metadata_id serial PRIMARY KEY,
+    artist_id integer REFERENCES Artists(artist_id),
+    type metadata_enum DEFAULT 'genre',
+    value varchar(100)
+);
+
+CREATE TABLE IF NOT EXISTS Song_Metadata (
     metadata_id serial PRIMARY KEY,
     song_id integer REFERENCES Songs(song_id),
     type metadata_enum DEFAULT 'genre',
@@ -55,11 +64,11 @@ CREATE TABLE IF NOT EXISTS Model_Performance (
 
 -- Queue tables
 CREATE TABLE IF NOT EXISTS Queue_JukeMIR (
-    spotify_url varchar(512) UNIQUE NOT NULL
+    spotify_id varchar(512) UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS Queue_Auditus (
-    spotify_url varchar(512) UNIQUE NOT NULL
+    spotify_id varchar(512) UNIQUE NOT NULL
 );
 
 -- Embedding tables
