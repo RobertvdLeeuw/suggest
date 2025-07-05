@@ -5,7 +5,7 @@ from spotdl import Spotdl
 from spotdl.types.options import DownloaderOptions
 
 from embedders import SongQueue
-from metadata import simple_queue_music
+from metadata import simple_queue_new_music
 
 
 DOWNLOAD_LOC = "./downloads"
@@ -75,8 +75,9 @@ async def start_download_loop(song_queues: list):
             LOGGER.debug(f"{q.name} queue has capacity, ready for new downloads")
             
             # Get song urls from db
-                # If queue empty, simple_queue_music()
+                # If queue empty, simple_queue_new_music()
             # LOGGER.info(f"Downloading song '{url}' for {name} queue.")
+            # Collect artist and song metadata here in non-blocking call.
             # download(url)
             # Append to queue
         await asyncio.sleep(30)

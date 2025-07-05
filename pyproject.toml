@@ -20,6 +20,7 @@ dependencies = [
     "pgvector>=0.4.1",
     "plotly>=6.1.2",
     "pylast>=5.5.0",
+    "python-dotenv>=1.1.1",
     "scikit-learn>=1.6.1",
     "seaborn>=0.13.2",
     "setuptools>=80.9.0",
