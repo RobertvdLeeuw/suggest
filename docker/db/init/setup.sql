@@ -7,9 +7,8 @@ CREATE TYPE metadata_enum AS ENUM ('tag', 'genre');
 CREATE TABLE IF NOT EXISTS Songs (
     song_id serial PRIMARY KEY,
     spotify_id varchar(255) UNIQUE NOT NULL,
-    song_name varchar(255) NOT NULL,
-    album varchar(255) NOT NULL,
-    spotify_url varchar(512) UNIQUE NOT NULL
+    song_name varchar(255) NOT NULL
+    -- album varchar(255) NOT NULL,
 );
 
 CREATE TABLE IF NOT EXISTS Artists (

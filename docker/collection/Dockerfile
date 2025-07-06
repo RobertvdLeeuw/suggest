@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
     git \
-    gcc \
+    # gcc \
     # libc-dev \
     # cmake \
     # libxslt-dev \

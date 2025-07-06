@@ -4,11 +4,16 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
-from sqlalchemy.dialects.postgresql import VECTOR
+from pgvector.sqlalchemy import Vector
+
+
 from enum import Enum
 import os
 
-# Define the metadata enum
+from dotenv import load_dotenv
+load_dotenv()
+
+
 class MetadataType(Enum):
     tag = "tag"
     genre = "genre"
@@ -21,11 +26,10 @@ class Song(Base):
     song_id = Column(Integer, primary_key=True, autoincrement=True)
     spotify_id = Column(String(255), unique=True, nullable=False)
     song_name = Column(String(255), nullable=False)
-    album = Column(String(255), nullable=False)
-    spotify_url = Column(String(512), unique=True, nullable=False)
+    # album = Column(String(255), nullable=False)
 
     artists = relationship("Artist", secondary="song_artist", back_populates="songs")
-    metadata = relationship("SongMetadata", back_populates="song", cascade="all, delete-orphan")
+    extra_data = relationship("SongMetadata", back_populates="song", cascade="all, delete-orphan")
     jukemir_embeddings = relationship("EmbeddingJukeMIR", back_populates="song", cascade="all, delete-orphan")
     jukemir_pca_embeddings = relationship("EmbeddingJukeMIRPCA250", back_populates="song", cascade="all, delete-orphan")
     auditus_embeddings = relationship("EmbeddingAuditus", back_populates="song", cascade="all, delete-orphan")
@@ -39,7 +43,7 @@ class Artist(Base):
     artist_name = Column(String(255), unique=True, nullable=False)
 
     songs = relationship("Song", secondary="song_artist", back_populates="artists")
-    metadata = relationship("ArtistMetadata", back_populates="artist", cascade="all, delete-orphan")
+    extra_data = relationship("ArtistMetadata", back_populates="artist", cascade="all, delete-orphan")
 
 class SongArtist(Base):
     __tablename__ = 'song_artist'
@@ -55,7 +59,7 @@ class ArtistMetadata(Base):
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
     value = Column(String(100))
 
-    artist = relationship("Artist", back_populates="metadata")
+    artist = relationship("Artist", back_populates="extra_data")
 
 class SongMetadata(Base):
     __tablename__ = 'song_metadata'
@@ -65,7 +69,7 @@ class SongMetadata(Base):
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
     value = Column(String(100))
 
-    song = relationship("Song", back_populates="metadata")
+    song = relationship("Song", back_populates="extra_data")
 
 class User(Base):
     __tablename__ = 'users'
@@ -102,7 +106,7 @@ class ModelPerformance(Base):
     model = relationship("Model", back_populates="performances")
     metric = relationship("Metric", back_populates="performances")
 
-# Queue tables
+
 class QueueJukeMIR(Base):
     __tablename__ = 'queue_jukemir'
 
@@ -113,13 +117,13 @@ class QueueAuditus(Base):
 
     spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
 
-# Embedding tables
+
 class EmbeddingJukeMIR(Base):
     __tablename__ = 'embeddings_jukemir'
 
     song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
     chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(VECTOR(4800))
+    embedding = Column(Vector(4800))
 
     song = relationship("Song", back_populates="jukemir_embeddings")
 
@@ -128,7 +132,7 @@ class EmbeddingJukeMIRPCA250(Base):
 
     song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
     chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(VECTOR(250))
+    embedding = Column(Vector(250))
 
     song = relationship("Song", back_populates="jukemir_pca_embeddings")
 
@@ -137,7 +141,7 @@ class EmbeddingAuditus(Base):
 
     song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
     chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(VECTOR(768))
+    embedding = Column(Vector(768))
 
     song = relationship("Song", back_populates="auditus_embeddings")
 
@@ -146,88 +150,42 @@ class EmbeddingAuditusPCA250(Base):
 
     song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
     chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(VECTOR(250))
+    embedding = Column(Vector(250))
 
     song = relationship("Song", back_populates="auditus_pca_embeddings")
 
-# Vector similarity search indexes
-# Note: These indexes are created via raw SQL as they're specific to pgvector
-
-# Database setup and session management
 class DatabaseManager:
     def __init__(self, database_url: str = None):
         if database_url is None:
-            # Default connection string - modify as needed
-            database_url = os.getenv('DATABASE_URL', 'postgresql://user:password@localhost/music_db')
+            database_url = 'postgresql://postgres:test@postgres:5432/db'
 
         self.engine = create_engine(database_url)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
 
-    def create_tables(self):
-        """Create all tables"""
-        Base.metadata.create_all(bind=self.engine)
-
-    def create_extensions_and_indexes(self):
-        """Create PostgreSQL extensions and vector indexes"""
-        with self.engine.connect() as conn:
-            # Create vector extension
-            conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-
-            # Create custom enum type
-            conn.execute("CREATE TYPE metadata_enum AS ENUM ('tag', 'genre');")
-
-            # Create vector indexes (commented out the high-dimensional one as per original SQL)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS jukemir_pca_vector_idx ON embeddings_jukemir_pca_250 
-                USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = 500);
-            """)
-
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS auditus_vector_idx ON embeddings_auditus 
-                USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = 800);
-            """)
-
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS auditus_pca_vector_idx ON embeddings_auditus_pca_250 
-                USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = 500);
-            """)
-
-            conn.commit()
 
     def get_session(self):
-        """Get a database session"""
         return self.SessionLocal()
 
 # Usage example
 def main():
-    # Initialize database manager
     db_manager = DatabaseManager()
 
-    # Create extensions and tables
-    db_manager.create_extensions_and_indexes()
-    db_manager.create_tables()
-
-    # Example usage
     session = db_manager.get_session()
 
     try:
         # Create a new artist
         artist = Artist(
-            spotify_id="spotify_artist_123",
-            artist_name="Example Artist"
+            spotify_id="4l8xPGtl6DHR2uvunqrl8r",
+            artist_name="CAN"
         )
         session.add(artist)
         session.commit()
 
         # Create a new song
         song = Song(
-            spotify_id="spotify_song_456",
-            song_name="Example Song",
-            album="Example Album",
-            spotify_url="https://open.spotify.com/track/example"
+            spotify_id="3dzCClyQ3qKx2o3CLIx02r",
+            song_name="Animal Waves",
+            # album="Example Album",
         )
         session.add(song)
         session.commit()

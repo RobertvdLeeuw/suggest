@@ -77,6 +77,10 @@
           nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
             _final.resolveBuildSystem { setuptools = []; };
         });
+        psycopg2 = _prev.psycopg2.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
+            _final.resolveBuildSystem { setuptools = []; };
+        });
         jaconv = _prev.jaconv.overrideAttrs (old: {
           nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
             _final.resolveBuildSystem { setuptools = []; };
