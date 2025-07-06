@@ -11,7 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import os
 
 from embedders import start_processes, end_processes
-from downloader import start_download_loop, clean_downloads
+from downloader import start_download_loop, clean_downloads, _download
 
 
 async def main():

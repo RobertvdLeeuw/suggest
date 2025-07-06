@@ -4,10 +4,12 @@ import numpy as np
 import pandas as pd
 
 
-class LinUCB(Model):
+class LinUCB(Layer):
     name = "LinUCB"
 
-    def __init__(self, n_dim: int, alpha: float, update_step: int, feature_start: float, description="") -> None:
+    def __init__(self, metrics: list[Metric]
+                 n_dim: int, n_in: int, n_out: int, 
+                 alpha: float, update_step: int, feature_start: float) -> None:
         assert alpha > 0
         super().__init__()
 
