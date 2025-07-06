@@ -8,6 +8,7 @@ RUN apt-get update \
         postgresql-server-dev-16 \
         git \
         ca-certificates \
+        wget \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone and build pgvector

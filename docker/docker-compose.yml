@@ -4,8 +4,12 @@ services:
       context: ..
       dockerfile: docker/db/Dockerfile
     container_name: postgres-db
-    env_file:
-      - ../.env
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: test 
+      POSTGRES_DB: vectordb
+      # Optional: Customize PostgreSQL config
+      # POSTGRES_INITDB_ARGS: "--data-checksums"
     ports:
       - "5432:5432"
     volumes:
@@ -24,12 +28,17 @@ services:
     build:
       context: ..
       dockerfile: docker/collection/Dockerfile
-    container_name: song-collector
+    container_name: python-embedder
     environment:
+      DB_USER: postgres
+      DB_PASSWORD: test
+      SPOTIFY_ID: "a766651ba4b744ed82f1e520a75b2455"
+      SPOTIFY_SECRET: "767732da0b064b838ebe5d0e3f6ce4eb"
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: vectordb
+      # Set this to "1" to enable development mode
       DEVELOPMENT_MODE: "1"
-      # LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/usr/lib:/lib"
-    env_file:
-      - ../.env
     # volumes:
     #   - ./app:/app
     depends_on:
