@@ -4,16 +4,7 @@ from logging.handlers import RotatingFileHandler
 
 LOG_LEVELS = {'__name__': logging.DEBUG,  # The logger used we use.
               'sqlalchemy.engine': logging.WARNING,
-              'cuda': logging.WARNING,
-              # 'httpx': logging.WARNING
-              
-              'librosa': logging.WARNING,
-              'librosa.util.files': logging.WARNING,
-              'jukebox': logging.WARNING,
-              'jukebox.utils.remote_utils': logging.WARNING,
-              'tensorflow': logging.WARNING,
-              'tensorflow.core': logging.WARNING,
-              'absl': logging.WARNING,
+              # '': logging.WARNING
               }
 
 for id, level in LOG_LEVELS.items():

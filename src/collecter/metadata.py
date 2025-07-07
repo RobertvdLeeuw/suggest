@@ -17,6 +17,10 @@ mb.set_useragent("Suggest: Music Recommender", "1.0", contact=os.environ["EMAIL_
 mb.set_rate_limit()
 mb.auth(os.environ["MB_USERNAME"], os.environ["MB_PW"])
 
+from models import QueueJukeMIR, QueueAuditus
+from db import get_session
+
+
 SCOPES = ['user-library-read',
           'playlist-read-private',
           'playlist-read-collaborative']
@@ -153,18 +157,19 @@ def get_sp_artist_tracks(artist_id: str) -> list[str]:
 
 
 def _add_to_db_queue(spotify_track_ids: list[str]):
-    for track_id in set(spotify_track_ids):  # Set to skip duplicates.
-        pass
-        # If associated song is already processed (in Songs table): skip.
+    with get_session() as s:
+        # TODO: If associated song is already processed (in Songs table): skip.
 
-        # push to db
+        for track_id in set(spotify_track_ids):  # Set to skip duplicates.
+            s.add(QueueJukeMIR(spotify_id=track_id))
+            s.add(QueueAuditus(spotify_id=track_id))
+        s.commit()
 
-# TODO: Some kind of live/remastered filter? Those are effectively duplicates.
+# TODO: Some kind of live/remastered filter? Those are effectively duplicates (in most cases).
 
 def queue_sp_user():  # TODO: Take userID instead of current user.
     LOGGER.info("Queueing user's Spotify library")
     liked = _get_sp_liked_tracks()
-    
     playlist_ids = _get_sp_user_playlist()
     
     LOGGER.debug(f"Processing {len(playlist_ids)} playlists")
@@ -199,12 +204,12 @@ def _get_mb_artist_tags(musicbrainz_id: str | None) -> list[str]:
         # LOGGER.warning(f"Something went wrong with the request: {traceback.format_exc()}")
         return []
     
-def get_artist_metadata(spotify_id: str) -> dict:
+def push_artist_metadata(spotify_id: str) -> dict:
     lfm_tags = _sp_to_lastfm(spotify_id).get_top_tags()
     return {"LastFM": [tag.item.get_name().lower() for tag in lfm_tags],
             "MusicBrainz": _get_mb_artist_tags(_sp_to_mb(spotify_id))}
 
-def get_track_metadata(spotify_id: str) -> dict:
+def push_track_metadata(spotify_id: str) -> dict:
     track = sp.track(spotify_id)
     mb_track = mb.search_recordings(f"{track["artists"][0]["name"]} - {track["name"]}")
     mb_tags = mb.get_recording_by_id(mb_track["recording-list"][0]["id"],
@@ -215,136 +220,6 @@ def get_track_metadata(spotify_id: str) -> dict:
 
     return {"LastFM": [tag.item.get_name().lower() for tag in lfm_tags],
             "MusicBrainz": [x["name"].lower() for x in mb_tags["recording"].get("tag-list", [])]}
-
-if __name__ == "__main__":
-    artist = "CAN"
-    artist_id = "4l8xPGtl6DHR2uvunqrl8r"
-    song = "Animal Waves"  # Objectively the best song ever.
-    track_id= "3dzCClyQ3qKx2o3CLIx02r"
-    
-    print("Testing Music Metadata Scraper Functions")
-    print("=" * 50)
-        
-    # Test conversion functions
-    print("Testing conversion functions:")
-    try:
-        print("\n1. Testing _sp_to_lastfm:")
-        lastfm_artist = _sp_to_lastfm(artist_id)
-        print(f"   LastFM artist: {lastfm_artist.get_name()}")
-    except Exception:
-        print(f"   Error: {traceback.format_exc()}")
-    
-    try:
-        print("\n2. Testing _sp_to_mb:")
-        mb_id = _sp_to_mb(artist_id)
-        print(f"   MusicBrainz ID: {mb_id}")
-    except Exception:
-        print(f"   Error: {traceback.format_exc()}")
-    
-    try:
-        print("\n3. Testing _lastfm_to_sp:")
-        sp_artist = _lastfm_to_sp(lastfm_artist)
-        print(f"   Spotify artist name: {sp_artist}")
-    except Exception:
-        print(f"   Error: {traceback.format_exc()}")
-    
-    # Test similarity functions
-    # print("\n" + "=" * 50)
-    # print("Testing similarity functions:")
-    # try:
-    #     print("\n4. Testing get_similar_artists (1 degree):")
-    #     similar_artists = get_similar_artists(artist_id, degrees=1)
-    #     print(f"   Similar artists: {similar_artists[:5]}...")  # Show first 5
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # Test collection functions
-    # print("\n" + "=" * 50)
-    # print("Testing collection functions:")
-    # try:
-    #     print("\n5. Testing _get_sp_liked_tracks:")
-    #     liked_tracks = _get_sp_liked_tracks()
-    #     print(f"   Found {len(liked_tracks)} liked tracks")
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # try:
-    #     print("\n6. Testing _get_sp_user_playlist:")
-    #     playlists = _get_sp_user_playlist()
-    #     print(f"   Found {len(playlists)} playlist tracks")
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # try:
-    #     print("\n7. Testing _get_sp_artist_albums:")
-    #     albums = _get_sp_artist_albums(artist_id)
-    #     print(f"   Found {len(albums)} albums")
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # try:
-    #     print("\n8. Testing get_sp_artist_tracks:")
-    #     artist_tracks = get_sp_artist_tracks(artist_id)
-    #     print(f"   Found {len(artist_tracks)} artist tracks")
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # Test queue functions
-    # print("\n" + "=" * 50)
-    # print("Testing queue functions:")
-    # try:
-    #     print("\n9. Testing _add_to_db_queue:")
-    #     test_track_ids = [track_id] if track_id else []
-    #     _add_to_db_queue(test_track_ids)
-    #     print(f"   Queued {len(test_track_ids)} tracks")
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # try:
-    #     print("\n10. Testing queue_sp_user:")
-    #     queue_sp_user()
-    #     print("   User tracks queued successfully")
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # try:
-    #     print("\n11. Testing queue_sp_history:")
-    #     test_history = [{"spotify_track_uri": f"spotify:track:{track_id}"}] if track_id else []
-    #     queue_sp_history(test_history)
-    #     print(f"   Queued {len(test_history)} history tracks")
-    # except Exception:
-    #     print(f"   Error: {traceback.format_exc()}")
-    
-    # Test metadata functions
-    print("\n" + "=" * 50)
-    print("Testing metadata functions:")
-    try:
-        print("\n12. Testing _get_mb_artist_tags:")
-        mb_tags = _get_mb_artist_tags(mb_id if 'mb_id' in locals() else None)
-        print(f"   MusicBrainz tags: {mb_tags[:5]}...")  # Show first 5
-    except Exception:
-        print(f"   Error: {traceback.format_exc()}")
-    
-    try:
-        print("\n13. Testing get_artist_metadata:")
-        artist_metadata = get_artist_metadata(artist_id)
-        print(f"   Artist metadata keys: {artist_metadata}")
-    except Exception:
-        print(f"   Error: {traceback.format_exc()}")
-    
-    if track_id:
-        try:
-            print("\n14. Testing get_track_metadata:")
-            track_metadata = get_track_metadata(track_id)
-            print(f"   Track metadata keys: {track_metadata}")
-        except Exception:
-            print(f"   Error: {traceback.format_exc()}")
-    else:
-        print("\n14. Skipping get_track_metadata (no track ID found)")
-    
-    print("\n" + "=" * 50)
-    print("Testing complete!")
-
 # LastFM
 # - Track -> tags
 # Track -> similar tracks

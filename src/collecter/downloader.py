@@ -11,6 +11,11 @@ from spotdl.types.options import DownloaderOptions
 from embedders import SongQueue
 from metadata import simple_queue_new_music
 
+from models import (
+    Song, Metadata,
+    Artist, SongArtist, ArtistMetadata, 
+)
+from db import get_session
 
 DOWNLOAD_LOC = "./downloads"
 def _sync_download(spotify_id: str) -> str:

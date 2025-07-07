@@ -3,6 +3,9 @@ import traceback
 
 import multiprocessing as mp
 
+from models import QueueJukeMIR, QueueAuditus, EmbeddingJukeMIR, EmbeddingAuditus
+from db import get_session
+
 from math import floor
 import numpy as np
 
