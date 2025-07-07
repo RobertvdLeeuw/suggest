@@ -23,7 +23,7 @@ RUN uv pip install --system -e .
 
 RUN pip install spotdl
 
-COPY src/collection/* .
+COPY src/collecter/* .
 # TODO: Something .env loading
 COPY src/logger.py .
 CMD ["python", "main.py"]
