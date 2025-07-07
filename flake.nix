@@ -41,7 +41,10 @@
 
       # Load a uv workspace from a workspace root.
       # Uv2nix treats all uv projects as workspace projects.
-      workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./.; };  # Loading in pyproject and project data.
+      workspace = uv2nix.lib.workspace.loadWorkspace {
+        workspaceRoot = ./.;
+        config.deps = "all";
+      };  # Loading in pyproject and project data.
 
       # Create package overlay from workspace.
       overlay = workspace.mkPyprojectOverlay { 
@@ -86,49 +89,6 @@
             _final.resolveBuildSystem { setuptools = []; };
         });
 
-
-        # "tensorflow-rocm" = _prev."tensorflow-rocm".overrideAttrs (old: {
-        #   buildInputs = (old.buildInputs or []) ++ [ 
-        #     pkgs.stdenv.cc.cc.lib 
-        #     pkgs.glibc 
-
-        #     # ROCm libraries
-        #     pkgs.rocmPackages.llvm.llvm
-        #     pkgs.rocmPackages.hipcc
-        #     pkgs.rocmPackages.hipify
-        #     pkgs.rocmPackages.hiprand
-        #     pkgs.rocmPackages.hipblaslt
-        #     pkgs.rocmPackages.hip-common
-        #     pkgs.rocmPackages.hipblas-common
-        #     pkgs.rocmPackages.rpp-hip
-
-        #     pkgs.rocmPackages.hipblas
-        #     pkgs.rocmPackages.hipfft
-        #     pkgs.rocmPackages.hipsolver
-        #     pkgs.rocmPackages.hipsparse
-        #     pkgs.rocmPackages.rpp
-        #     pkgs.rocmPackages.rocblas
-        #     pkgs.rocmPackages.clr
-        #     pkgs.rocmPackages.hipcub
-        #     pkgs.rocmPackages.miopen
-        #     pkgs.rocmPackages.rocm-smi
-        #     pkgs.rocmPackages.rccl
-        #     pkgs.rocmPackages.rocthrust
-
-        #     pkgs.libzip
-        #     pkgs.libz
-        #     pkgs.zlib
-        #     pkgs.zlib-ng
-        #     # pythonPkgs.zlib-ng
-        #     pkgs.zstd
-
-        #     pkgs.xz
-        #     # pythonPkgs.pylzma
-
-        #     pkgs.cmake
-        #     pkgs.ninja
-        #   ];
-        # });
       };
 
       # This example is only using x86_64-linux

@@ -1,5 +1,9 @@
 from logger import LOGGER
 import traceback
+import os
+
+from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 from spotdl import Spotdl
 from spotdl.types.options import DownloaderOptions
@@ -44,7 +48,7 @@ def _sync_download(spotify_id: str) -> str:
         raise Exception("No song found")
 
 
-async def _download(spotify_id: str):
+async def _download(spotify_id: str, song_queues: list[SongQueue]):
     LOGGER.info(f"Starting async download process for: {spotify_id}")
 
     try:
@@ -55,15 +59,16 @@ async def _download(spotify_id: str):
             file_path = await loop.run_in_executor(executor, _sync_download, spotify_id)
         
         LOGGER.debug(f"Adding {file_path} to processing queues")
-        _JUKEMIR_QUEUE.put(file_path)
-        _AUDITUS_QUEUE.put(file_path)
+
+        for q in song_queues:
+            q.put(file_path)
 
         LOGGER.info(f"Downloading song '{file_path}' successful.")
         
     except Exception as e:
         LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
 
-async def start_download_loop(song_queues: list):
+async def start_download_loop(song_queues: list[SongQueue]):
     LOGGER.info(f"Download loop started.")
 
     while True:

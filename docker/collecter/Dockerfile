@@ -4,13 +4,6 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y \
     git \
-    # gcc \
-    # libc-dev \
-    # cmake \
-    # libxslt-dev \
-    # libxml2-dev \
-    # libffi-dev \
-    # libssl-dev \
     libsndfile1 \
     libsndfile1-dev \
     ffmpeg \
@@ -19,11 +12,14 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml .
-RUN uv pip install --system -e .
+RUN uv pip install --system -e .[collecter,db]
 
 RUN pip install spotdl
 
 COPY src/collecter/* .
-# TODO: Something .env loading
+COPY src/db.py .
+COPY src/models.py .
 COPY src/logger.py .
+
 CMD ["python", "main.py"]
+

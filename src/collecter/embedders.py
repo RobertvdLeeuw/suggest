@@ -5,8 +5,13 @@ import multiprocessing as mp
 
 from math import floor
 import numpy as np
-import pandas as pd
 
+LOGGER.debug(f"Importing JukeMIR Module.")
+import librosa as lr
+import jukemirlib
+
+LOGGER.debug(f"Importing Auditus Module.")
+from auditus.transform import AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
 
 SEGMENT_OVERLAP = 1 
 SEGMENT_LENGTH = 24 
@@ -131,13 +136,6 @@ EMBEDDERS = [(_jukemir_embed, "JukeMIR"),
 PROCESSES = []
 def start_processes() -> list[SongQueue]:
     # So we don't wait a shitload when testing smth else which happens to import this script.
-        # TODO: Test whether stupid Python everything on heap fucks this up.
-    LOGGER.debug(f"Importing JukeMIR Module.")
-    import librosa as lr
-    import jukemirlib
-
-    LOGGER.debug(f"Importing Auditus Module.")
-    from auditus.transform import AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
     queues = []
     for embed_func, name in EMBEDDERS:
         q = SongQueue(name)
