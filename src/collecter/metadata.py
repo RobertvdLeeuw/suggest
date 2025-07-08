@@ -17,7 +17,7 @@ mb.set_useragent("Suggest: Music Recommender", "1.0", contact=os.environ["EMAIL_
 mb.set_rate_limit()
 mb.auth(os.environ["MB_USERNAME"], os.environ["MB_PW"])
 
-from models import QueueJukeMIR, QueueAuditus
+from models import QueueJukeMIR, QueueAuditus, Song, SongMetadata, Artist, ArtistMetadata, MetadataType
 from db import get_session
 
 
@@ -38,16 +38,11 @@ lastfm = pylast.LastFMNetwork(
 )
 
 
-def _sp_to_lastfm(artist_id: str) -> Artist:
+def _sp_to_lastfm(artist_id: str) -> Artist | None:
     """
     Song - artist combo is a much more unique identifier than just song name.
         Universal IDs like ISRC or EAN don't have enough coverage.
             - maybe ID with fallback system?
-
-        If the top song happens to be featuring another artist, 
-            it's a 50/50 whether we get the right one. 
-        Compare artists on top N songs for more certainty?
-            - or will a simple name artist name check work for such cases?
     """
 
     top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
@@ -60,30 +55,41 @@ def _sp_to_lastfm(artist_id: str) -> Artist:
     
     return lastfm_artist
 
-def _sp_to_mb(artist_id: str) -> str:
+def _sp_to_mb(artist_id: str) -> str | None:
     top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
     artist_name = sp.artist(artist_id)["name"]
     LOGGER.debug(f"Searching MusicBrainz for: {artist_name} - {top_song}")
 
     res = mb.search_recordings(f"{sp.artist(artist_id)["name"]} - {top_song}")
-    mb_name = res["recording-list"][0]["artist-credit"][0]["artist"]["name"]
-    mb_id = res["recording-list"][0]["artist-credit"][0]["artist"]["id"]
+    for mb_artist in res["recording-list"][0]["artist-credit"]:
+        if artist_name.strip().lower() == mb_artist["artist"]["name"].strip().lower():
+            mb_name = mb_artist["artist"]["name"]
+            mb_id = mb_artist["artist"]["id"]
+            break
+    else:
+        artist_names = [a["artist"]["name"] for a in res["recording-list"][0]["artist-credit"]]
+        LOGGER.warning(f"No MusicBrainz match found for {artist_name} among: {", ".join(artist_names)}")
+        return
 
     LOGGER.info(f"Found MusicBrainz match for '{artist_name}': {mb_name} ({mb_id})")
-
     return mb_id
 
 
-def _lastfm_to_sp(artist: Artist) -> str:
+def _lastfm_to_sp(artist: Artist) -> str | None:
     top_song = artist.get_top_tracks()[0].item.get_title()
     artist_name = artist.get_name()
-    query = f"{artist_name} - {top_song}"
-    res = sp.search(query, type="track")
 
-    LOGGER.debug(f"Searching Spotify for: {query}")
+    LOGGER.debug(f"Searching Spotify for: {artist_name} - {top_song}")
 
-    res = sp.search(query, type="track")
-    spotify_artist = res["tracks"]["items"][0]["artists"][0]
+    res = sp.search(f"{artist_name} - {top_song}", type="track")
+    for sp_artist in res["tracks"]["items"][0]["artists"]:
+        if artist_name.strip().lower() == sp_artist.strip().lower():
+            spotify_artist = sp_artist
+            break
+    else:
+        artist_names = [a["name"] for a in res["tracks"]["items"][0]["artists"]]
+        LOGGER.warning(f"No Spotify match found for {artist_name} among: {", ".join(artist_names)}")
+        return
     
     LOGGER.debug(f"Found Spotify match for {artist_name}: {spotify_artist["name"]}")
     
@@ -95,6 +101,7 @@ def get_similar_artists(spotify_artist_id: str, degrees=1) -> list[str]:
 
     similar = [_lastfm_to_sp(a.item) 
                for a in _sp_to_lastfm(spotify_artist_id).get_similar(limit=3)]
+    similar = [s for s in similar if x is not None]
 
     LOGGER.debug(f"Found {len(similar)} similar artists: {similar}")
 
@@ -104,60 +111,76 @@ def get_similar_artists(spotify_artist_id: str, degrees=1) -> list[str]:
     return [get_similar_artists(artist, degree-1) for artist in similar]
 
 
-def _sp_collect_results(chunk: dict) -> list[str]:
+def _sp_collect_results(chunk: dict, data_type: str) -> list[str]:
     items = chunk["items"]
 
+    i = 0
     while chunk.get("next"):
+        i += 1
+
         chunk = sp.next(chunk)
         items.extend(chunk["items"])
+        LOGGER.debug(f"Collecting {data_type}, chunk {i}.")
     
     return items
 
 def _get_sp_playlist_tracks(playlist_id: str) -> list[str]:
-    items = _sp_collect_results(sp.playlist(playlist_id)["tracks"])
+    LOGGER.debug(f"Getting tracks of playlist {"spotify_id"}.")
+
+    items = _sp_collect_results(sp.playlist(playlist_id)["tracks"], "playlist tracks")
     track_ids = [track["track"]["id"] for track in items]
     
     LOGGER.debug(f"Found {len(track_ids)} tracks in playlist {playlist_id}")
     return track_ids
 
 def _get_sp_user_playlist() -> list[str]:
-    items = _sp_collect_results(sp.current_user_playlists(limit=50))
+    LOGGER.debug(f"Getting user playlists.")
+
+    items = _sp_collect_results(sp.current_user_playlists(limit=50), "user playlists")
     playlist_ids = [playlist["id"] for playlist in items]
     
     LOGGER.info(f"Found {len(playlist_ids)} user playlists")
     return playlist_ids
 
 def _get_sp_liked_tracks() -> list[str]:
-    items = _sp_collect_results(sp.current_user_saved_tracks(limit=50))
+    LOGGER.debug(f"Getting liked user tracks.")
+
+    items = _sp_collect_results(sp.current_user_saved_tracks(limit=50), "user liked")
     track_ids = [track["track"]["id"] for track in items]
     
     LOGGER.info(f"Found {len(track_ids)} liked tracks")
     return track_ids
 
 def _get_sp_album_tracks(album_id: str) -> list[str]:
-    items = _sp_collect_results(sp.album_tracks(album_id, limit=50))
+    LOGGER.debug(f"Getting tracks of album {"spotify_id"}.")
+
+    items = _sp_collect_results(sp.album_tracks(album_id, limit=50), "album tracks")
     album_ids = [album["id"] for album in items]
     
     LOGGER.debug(f"Found {len(album_ids)} tracks in album {album_id}")
     return album_ids
 
 def _get_sp_artist_albums(artist_id: str) -> list[str]:
-    items = _sp_collect_results(sp.artist_albums(artist_id, limit=50))
+    LOGGER.debug(f"Getting albums of artist {artist_id}.")
+
+    items = _sp_collect_results(sp.artist_albums(artist_id, limit=50), "artist albums")
     album_ids = [album["id"] for album in items]
     
     LOGGER.debug(f"Found {len(album_ids)} albums for artist {artist_id}")
     return album_ids
 
 def get_sp_artist_tracks(artist_id: str) -> list[str]:
+    LOGGER.debug(f"Getting tracks of artist {artist_id}.")
+
+    # TODO: singles too (but prevent overlap/duplicates)
     albums = _get_sp_artist_albums(artist_id)
     tracks = [track for album in albums for track in _get_sp_album_tracks(album)]
     
     LOGGER.info(f"Found {len(tracks)} total tracks for artist {artist_id}")
     return tracks
 
-
-def _add_to_db_queue(spotify_track_ids: list[str]):
-    with get_session() as s:
+async def _add_to_db_queue(spotify_track_ids: list[str]):
+    async with get_session() as s:
         # TODO: If associated song is already processed (in Songs table): skip.
 
         for track_id in set(spotify_track_ids):  # Set to skip duplicates.
@@ -167,7 +190,7 @@ def _add_to_db_queue(spotify_track_ids: list[str]):
 
 # TODO: Some kind of live/remastered filter? Those are effectively duplicates (in most cases).
 
-def queue_sp_user():  # TODO: Take userID instead of current user.
+async def queue_sp_user():  # TODO: Take userID instead of current user.
     LOGGER.info("Queueing user's Spotify library")
     liked = _get_sp_liked_tracks()
     playlist_ids = _get_sp_user_playlist()
@@ -176,14 +199,14 @@ def queue_sp_user():  # TODO: Take userID instead of current user.
     playlist_tracks = [track for p in playlist_ids
                        for track in _get_sp_playlist_tracks(p)]
     
-    _add_to_db_queue(liked + playlist_tracks)
+    await _add_to_db_queue(liked + playlist_tracks)
 
-def queue_sp_history(history: list[dict]):
+async def queue_sp_history(history: list[dict]):
     LOGGER.info(f"Queueing {len(history)} tracks from listening history")
     song_ids = [listen["spotify_track_uri"].split(":")[-1] for listen in history]
-    _add_to_db_queue(song_ids)
+    await _add_to_db_queue(song_ids)
 
-def simple_queue_new_music():
+async def simple_queue_new_music():
     LOGGER.info("Queueing new music based on similar artists")
     # get known artists from DB
     similar = [get_similar_artists(a) for a in artists]
@@ -191,7 +214,7 @@ def simple_queue_new_music():
     
     tracks = [t for t in get_sp_artist_tracks(a) for a in similar]
     LOGGER.info(f"Queueing {len(tracks)} tracks from similar artists")
-    _add_to_db_queue(tracks)
+    await _add_to_db_queue(tracks)
 
 def _get_mb_artist_tags(musicbrainz_id: str | None) -> list[str]:
     # We could also use MBID for this but on the very first artist (CAN) I tried it was already wrong.
@@ -204,22 +227,90 @@ def _get_mb_artist_tags(musicbrainz_id: str | None) -> list[str]:
         # LOGGER.warning(f"Something went wrong with the request: {traceback.format_exc()}")
         return []
     
-def push_artist_metadata(spotify_id: str) -> dict:
-    lfm_tags = _sp_to_lastfm(spotify_id).get_top_tags()
-    return {"LastFM": [tag.item.get_name().lower() for tag in lfm_tags],
-            "MusicBrainz": _get_mb_artist_tags(_sp_to_mb(spotify_id))}
+async def create_push_artist(spotify_id: str) -> Artist:
+    artist_name = sp.artist(spotify_id)["name"]
 
-def push_track_metadata(spotify_id: str) -> dict:
+    async with get_session() as s:
+        artist.extra_data = []
+        if lfm_artist := _sp_to_lastfm(spotify_id):
+            LOGGER.debug(f"Adding LastFM tags to artist '{artist_name}'.")
+            artist.extra_data.extend(
+                [ArtistMetadata(type=MetadataType.genre, 
+                                value=tag.item.get_name().strip().capitalize(), 
+                                source="LastFM")
+                    for tag in lfm_artist.get_top_tags()]
+            )
+
+        if mb_artist := _get_mb_artist_tags(_sp_to_mb(spotify_id)):
+            LOGGER.debug(f"Adding MusicBrainz tags to artist '{artist_name}'.")
+            artist.extra_data.extend(
+                [ArtistMetadata(type=MetadataType.genre, 
+                                value=tag.item.get_name().lower(), 
+                                source="MusicBrainz")
+                    for tag in mb_artist]
+            )
+
+        s.add(artist)
+        s.commit()
+
+    LOGGER.info(f"Successfully created artist '{artist_name}'.")
+    return artist
+
+# TODO: Decorator for try-except for common DB errors.
+async def push_track_metadata(spotify_id: str) -> Song:
     track = sp.track(spotify_id)
-    mb_track = mb.search_recordings(f"{track["artists"][0]["name"]} - {track["name"]}")
-    mb_tags = mb.get_recording_by_id(mb_track["recording-list"][0]["id"],
-                                     includes=["tags", "user-tags"])
 
-    lfm_tags = lastfm.get_track(artist=track["artists"][0]["name"],
-                                title=track["name"]).get_top_tags()
+    async with get_session() as s:
+        result = await s.execute(
+            select(Song).where(Song.spotify_id == spotify_id)
+        )
+        existing_song = result.scalar_one_or_none()
+        
+        if existing_song:
+            LOGGER.info(f"Song {track["name"]} already exists")
+            return
 
-    return {"LastFM": [tag.item.get_name().lower() for tag in lfm_tags],
-            "MusicBrainz": [x["name"].lower() for x in mb_tags["recording"].get("tag-list", [])]}
+        artists = []
+        for artist_data in track["artists"]:
+            result = await s.execute(select(Artist).where(Artist.spotify_id == artist_data["id"]))
+            artist = result.scalar_one_or_none()
+            
+            if not artist:
+                LOGGER.debug(f"Creating new artist: {artist["name"]}'.")
+                artist = await create_push_artist(artist["id"])
+            
+            artists.append(artist)
+
+        song = Song(spotify_id=spotify_id, 
+                    song_name=track["name"],
+                    artists=artists)
+
+        song.extra_data = []
+        if lfm_song := lastfm.get_track(artist=track["artists"][0]["name"], title=track["name"]):
+            LOGGER.debug(f"Adding LastFM tags to track '{track["name"]}'.")
+            song.extra_data.extend(
+                [SongMetadata(type=MetadataType.genre, 
+                              value=tag.item.get_name().strip().capitalize(), 
+                              source="LastFM")
+                    for tag in lfm_song.get_top_tags()] 
+            )
+
+        if mb_song := mb.search_recordings(f"{track["artists"][0]["name"]} - {track["name"]}"):
+            LOGGER.debug(f"Adding MusicBrainz tags to track '{track["name"]}'.")
+            song.extra_data.extend(
+                [SongMetadata(type=MetadataType.genre, 
+                              value=tag.item.get_name().lower(), 
+                              source="MusicBrainz")
+                    for tag in mb.get_recording_by_id(mb_song["recording-list"][0]["id"],
+                                                      includes=["tags", "user-tags"])]
+            )
+
+        s.add(song)
+        s.commit()
+
+    LOGGER.info(f"Successfully created song '{song.song_name}'.")
+    return song
+
 # LastFM
 # - Track -> tags
 # Track -> similar tracks

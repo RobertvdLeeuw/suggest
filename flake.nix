@@ -148,6 +148,8 @@
 
               pkgs.spotdl
               pkgs.libsndfile
+
+              pkgs.postgresql_16
               
               pkgs.rocmPackages.rocm-smi
               pkgs.rocmPackages.rocm-runtime

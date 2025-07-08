@@ -54,6 +54,7 @@ class ArtistMetadata(Base):
     artist_id = Column(Integer, ForeignKey('artists.artist_id'), nullable=False)
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
     value = Column(String(100))
+    source = Column(String(100))
 
     artist = relationship("Artist", back_populates="extra_data")
 
