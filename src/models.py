@@ -1,9 +1,11 @@
 from sqlalchemy import (
-    Column, Integer, String, Numeric, ForeignKey, 
+    Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean,
     Enum as SQLEnum,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from pgvector.sqlalchemy import Vector
 
 
@@ -23,9 +25,11 @@ class Song(Base):
     spotify_id = Column(String(255), unique=True, nullable=False)
     song_name = Column(String(255), nullable=False)
     # album = Column(String(255), nullable=False)
+    similar_queued = Column(Boolean(), default=False)
 
     artists = relationship("Artist", secondary="song_artist", back_populates="songs")
     extra_data = relationship("SongMetadata", back_populates="song", cascade="all, delete-orphan")
+
     jukemir_embeddings = relationship("EmbeddingJukeMIR", back_populates="song", cascade="all, delete-orphan")
     jukemir_pca_embeddings = relationship("EmbeddingJukeMIRPCA250", back_populates="song", cascade="all, delete-orphan")
     auditus_embeddings = relationship("EmbeddingAuditus", back_populates="song", cascade="all, delete-orphan")
@@ -108,11 +112,14 @@ class QueueJukeMIR(Base):
     __tablename__ = 'queue_jukemir'
 
     spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
+    created_at = Column(DateTime, default=func.now())
 
 class QueueAuditus(Base):
     __tablename__ = 'queue_auditus'
 
     spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
+    created_at = Column(DateTime, default=func.now())
+    
 
 
 class EmbeddingJukeMIR(Base):

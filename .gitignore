@@ -25,6 +25,7 @@ Cargo.lock
 
 # Logs and databases
 **/*.log
+**/*.log.*
 **/*.sqlite
 **/*.sqlite3
 **/*.db

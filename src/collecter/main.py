@@ -1,10 +1,9 @@
 from logger import LOGGER
-from db import get_session
-
-import traceback
-
 
 LOGGER.info("Starting imports...")
+
+from db import setup, get_session
+import traceback
 
 import asyncio
 import threading
@@ -21,6 +20,8 @@ async def main():
     LOGGER.info("=== Audio Processing Service Starting ===")
     LOGGER.info(f"Python PID: {os.getpid()}")
     LOGGER.debug(f"Current working directory: {os.getcwd()}")
+
+    await setup()
     
     try:
         LOGGER.info("Starting embedding worker processes...")

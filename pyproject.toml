@@ -16,6 +16,9 @@ dependencies = [
     # "tensorflow-rocm",
     "sqlalchemy>=2.0.41",
     "xmltodict>=0.14.2",
+    "asyncpg>=0.30.0",
+    "psycopg2-binary>=2.9.10",
+    "pgvector>=0.4.1",
 ]
 
 [project.optional-dependencies]

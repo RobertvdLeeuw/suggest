@@ -5,6 +5,9 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
+from sqlalchemy import select
+from db import get_session
+
 from spotdl import Spotdl
 from spotdl.types.options import DownloaderOptions
 
@@ -79,10 +82,15 @@ async def start_download_loop(song_queues: list[SongQueue]):
 
             async with get_session() as s:
                 n = QUEUE_MAX_LEN - len(q)
-                queue_items = s.query(q.q_type).limit(n).order_by(q.q_type.created_date.asc()).all()
+
+                queue_items = await s.execute(select(q.q_type.spotify_id)
+                                              .limit(n)
+                                              .order_by(q.q_type.created_at.asc()))
+                queue_items = queue_items.scalars().all()
 
             if len(queue_items) < n:
-                await simple_queue_new_music()  # TODO: Background task
+                continue
+                # await simple_queue_new_music()  # TODO: Background task
 
             asyncio.gather(*[_download(q_item.spotify_id, q) for q_item in queue_items])
 

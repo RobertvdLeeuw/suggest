@@ -27,22 +27,30 @@ async def init_db():
     try:
         ENGINE = create_async_engine(create_database_url(), 
                                      future=True, 
-                                     echo=True, 
+                                     echo=False, 
                                      pool_pre_ping=True)
+
+        # logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+        # logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
+        # logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
+        # logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
+
+        SESSION_FACTORY = async_sessionmaker(bind=ENGINE,
+                                             class_=AsyncSession,
+                                             expire_on_commit=False)  # Keep objects usable after commit.
     except Exception as e:
         LOGGER.error(f"Could not create session/connection: {traceback.format_exc()}")
-        exit()
+        raise Exception(f"Could not create session/connection: {traceback.format_exc()}")
 
 async def setup_tables():
+    await init_db()
+
     async with ENGINE.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
 
-    SESSION_FACTORY = async_sessionmaker(bind=ENGINE,
-                                         class_=AsyncSession,
-                                         expire_on_commit=False)  # Keep objects usable after commit.
 
-async def get_session() -> AsyncSession:
+def get_session() -> AsyncSession:
     if ENGINE is None:
         # TODO: Make this wait with timeout error?
         raise Exception("Tried to get session before DB engine was initialized.")
@@ -50,11 +58,14 @@ async def get_session() -> AsyncSession:
     return SESSION_FACTORY()
 
 
-LOGGER.info("Initializing DB engine.")
-asyncio.run(init_db())
+async def setup():
+    LOGGER.info("Initializing DB engine.")
+    await init_db()
+    LOGGER.info("DB connection initialized.")
 
-LOGGER.info("Setting up tables.")
-asyncio.run(setup_tables())
 
-LOGGER.info("DB connection initialized.")
+if __name__ == "__main__":
+    LOGGER.info("Setting up tables.")
+    asyncio.run(setup_tables())
+
 

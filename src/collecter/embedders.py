@@ -12,12 +12,12 @@ from db import get_session
 from math import floor
 import numpy as np
 
-LOGGER.debug(f"Importing JukeMIR Module.")
-import librosa as lr
-import jukemirlib
+# LOGGER.debug(f"Importing JukeMIR Module.")
+# import librosa as lr
+# import jukemirlib
 
-LOGGER.debug(f"Importing Auditus Module.")
-from auditus.transform import AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
+# LOGGER.debug(f"Importing Auditus Module.")
+# from auditus.transform import AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
 
 SEGMENT_OVERLAP = 1 
 SEGMENT_LENGTH = 24 
@@ -26,6 +26,46 @@ SAMPLE_RATE = 16_000  # Jukebox SR=44_100
 LAYER = 36
 
 MANAGER = mp.Manager()
+
+
+# Global variables to cache imports
+_jukemir_loaded = False
+_auditus_loaded = False
+lr = None
+jukemirlib = None
+AudioArray = None
+AudioLoader = None
+AudioEmbedding = None
+Resampling = None
+Pooling = None
+
+def _jukemir_load():
+    """Lazy load JukeMIR dependencies"""
+    global _jukemir_loaded, lr, jukemirlib
+    if not _jukemir_loaded:
+        LOGGER.debug("Loading JukeMIR Module...")
+        import librosa as _lr
+        import jukemirlib as _jukemirlib
+        
+        lr = _lr
+        jukemirlib = _jukemirlib
+        _jukemir_loaded = True
+        LOGGER.debug("JukeMIR Module loaded successfully")
+
+def _auditus_load():
+    """Lazy load Auditus dependencies"""
+    global _auditus_loaded, AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
+    if not _auditus_loaded:
+        LOGGER.debug("Loading Auditus Module...")
+        from auditus.transform import AudioArray as _AudioArray, AudioLoader as _AudioLoader, AudioEmbedding as _AudioEmbedding, Resampling as _Resampling, Pooling as _Pooling
+        
+        AudioArray = _AudioArray
+        AudioLoader = _AudioLoader
+        AudioEmbedding = _AudioEmbedding
+        Resampling = _Resampling
+        Pooling = _Pooling
+        _auditus_loaded = True
+        LOGGER.debug("Auditus Module loaded successfully")
 
 
 QueueObject = QueueJukeMIR | QueueAuditus
@@ -75,6 +115,8 @@ class SongQueue:  # Queue with peek and membership testing.
 
 
 def _jukemir_embed(file_path: str, spotify_id: str) -> list[EmbeddingJukeMIR]:
+    _jukemir_load()
+
     LOGGER.debug(f"Starting JukeMIR embedding for file: {file_path}")
 
     length = floor(lr.get_duration(filename=file_path))
@@ -98,6 +140,8 @@ def _jukemir_embed(file_path: str, spotify_id: str) -> list[EmbeddingJukeMIR]:
 
 
 def _auditus_embed(file_path: str, spotify_id: str) -> list[EmbeddingAuditus]:
+    _auditus_load()
+
     LOGGER.debug(f"Starting Auditus embedding for file: {file_path}")
 
     audio = AudioLoader.load_audio(file_path, sr=SAMPLE_RATE)
@@ -137,7 +181,7 @@ async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue)
                 result = await s.execute(delete(queue.q_type)
                                          .where(q.q_type.c.spotify_id == spotify_id))
                 
-                s.commit()
+                await s.commit()
                 LOGGER.debug(f"Pushed {name} embeddings of '{song_file}' to DB.")
 
             LOGGER.info(f"Embedding '{song_file}' using {name} successful.")
