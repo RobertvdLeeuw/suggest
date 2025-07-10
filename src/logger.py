@@ -9,7 +9,11 @@ logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
 logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
 logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 
-file_handler = RotatingFileHandler(f"log.log", maxBytes=100_000, backupCount=3)
+LOG_PATH = "log.log"
+with open(LOG_PATH, 'w'):
+    pass
+
+file_handler = RotatingFileHandler(LOG_PATH, maxBytes=1_000_000, backupCount=3)
 file_handler.setLevel(logging.DEBUG)
 file_handler.setFormatter(
     logging.Formatter(

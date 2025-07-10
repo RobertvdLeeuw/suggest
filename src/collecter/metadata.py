@@ -11,7 +11,7 @@ from pylast import Tag, Artist, Track
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
-from models import EmbeddingJukeMIR, EmbeddingAuditus
+from models import EmbeddingJukeMIR, EmbeddingAuditus, Artist
 
 SCOPES = ['user-library-read',
           'playlist-read-private',
@@ -26,6 +26,9 @@ sp_oauth = SpotifyOAuth(
 
 token_info = sp_oauth.refresh_access_token(os.environ["SPOTIFY_REFRESH_TOKEN"])
 sp = spotipy.Spotify(auth=token_info['access_token'])
+
+def get_spotipy():
+    return sp
 
 import musicbrainzngs as mb
 mb.set_useragent("Suggest: Music Recommender", "1.0", contact=os.environ["EMAIL_ADDR"])
@@ -68,7 +71,7 @@ def _sp_to_mb(artist_id: str) -> str | None:
     artist_name = sp.artist(artist_id)["name"]
     LOGGER.debug(f"Searching MusicBrainz for: {artist_name} - {top_song}")
 
-    res = mb.search_recordings(f"{sp.artist(artist_id)["name"]} - {top_song}")
+    res = mb.search_recordings(f'artist:"{artist_name}" AND recording:"{top_song}"')
     for mb_artist in res["recording-list"][0]["artist-credit"]:
         if artist_name.strip().lower() == mb_artist["artist"]["name"].strip().lower():
             mb_name = mb_artist["artist"]["name"]
@@ -193,15 +196,19 @@ async def check_in_table(table, col, value, session=None):
         session = await get_session()
 
     async with session:
-        result = await session.execute(select(table).where(col == value))
+        result = await session.execute(select(table).where(col == value).limit(1))
         # result = await session.execute(select(exists().where(col == value)))
-        return result.scalar_one_or_none()  # TODO: Does this just grab first for multiple results?
+        item = result.scalar_one_or_none()
+        LOGGER.debug(f"Checking {table.__name__} for {col.name}={value}: {'Found' if item else 'Not found'}")
+
+        return item  # TODO: Does this just grab first for multiple results?
 
 QUEUE_OBJECTS = [(EmbeddingJukeMIR, QueueJukeMIR, "JukeMIR"), 
                  (EmbeddingAuditus, QueueAuditus, "Auditus")]
 async def _add_to_db_queue(spotify_track_ids: list[str]):
     LOGGER.debug(f"Adding {len(spotify_track_ids)} songs to queue.")
 
+    new_tracks = []
     async with get_session() as s:
         for track_id in set(spotify_track_ids): 
             for emb_type, q_type, name in QUEUE_OBJECTS:
@@ -209,16 +216,18 @@ async def _add_to_db_queue(spotify_track_ids: list[str]):
                     LOGGER.debug(f"Song {track_id} already queued for {name}.")
                     continue
 
-
                 if song := await check_in_table(Song, Song.spotify_id, track_id, s):
                     if await check_in_table(emb_type, emb_type.song_id, song.song_id, s):
-                        LOGGER.debug(f"Song {track_id} already embedded for {name}.")
+                        LOGGER.debug(f"Song {track_id} already embedded by {name}.")
                         continue
 
                 LOGGER.debug(f"Pushing song {track_id} to {name} queue.")
-                s.add(q_type(spotify_id=track_id))
-        await s.commit()
-    LOGGER.info(f"Added {len(spotify_track_ids)} songs to queue.")
+                new_tracks.append(q_type(spotify_id=track_id))
+
+        if new_tracks:
+            s.add_all(new_tracks)
+            await s.commit()
+    LOGGER.info(f"Added {len(new_tracks)} queue items.")
 
 # TODO: Some kind of live/remastered filter? Those are effectively duplicates (in most cases).
 
@@ -261,6 +270,7 @@ async def simple_queue_new_music():
     async with get_session() as s:
         s.add_all(artists)
         await s.commit()
+        await s.refresh(artists)
 
 
 def _get_mb_artist_tags(musicbrainz_id: str | None) -> list[str]:
@@ -274,10 +284,163 @@ def _get_mb_artist_tags(musicbrainz_id: str | None) -> list[str]:
         # LOGGER.warning(f"Something went wrong with the request: {traceback.format_exc()}")
         return []
     
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import IntegrityError
+
 async def create_push_artist(spotify_id: str) -> Artist:
     artist_name = sp.artist(spotify_id)["name"]
+    LOGGER.debug(f"Adding {artist_name} to Artists with metadata.")
 
     async with get_session() as s:
+        try:
+            # Try to insert with ON CONFLICT DO NOTHING
+            stmt = insert(Artist).values(
+                spotify_id=spotify_id, 
+                artist_name=artist_name
+            )
+            stmt = stmt.on_conflict_do_nothing(index_elements=['spotify_id'])
+            result = await s.execute(stmt)
+            
+            # If insert succeeded, add metadata
+            if result.rowcount > 0:
+                # Get the inserted artist
+                artist_result = await s.execute(
+                    select(Artist).where(Artist.spotify_id == spotify_id)
+                )
+                artist = artist_result.scalar_one()
+                
+                # Add metadata
+                metadata = []
+                if lfm_artist := _sp_to_lastfm(spotify_id):
+                    LOGGER.debug(f"Adding LastFM tags to artist '{artist_name}'.")
+                    metadata.extend([
+                        ArtistMetadata(
+                            artist_id=artist.artist_id,
+                            type=MetadataType.genre, 
+                            value=tag.item.get_name().strip().capitalize(), 
+                            source="LastFM"
+                        ) for tag in lfm_artist.get_top_tags()
+                    ])
+
+                if mb_tags := _get_mb_artist_tags(_sp_to_mb(spotify_id)):
+                    LOGGER.debug(f"Adding MusicBrainz tags to artist '{artist_name}'.")
+                    metadata.extend([
+                        ArtistMetadata(
+                            artist_id=artist.artist_id,
+                            type=MetadataType.genre, 
+                            value=tag, 
+                            source="MusicBrainz"
+                        ) for tag in mb_tags
+                    ])
+                
+                if metadata:
+                    s.add_all(metadata)
+            else:
+                # Artist already exists, just fetch it
+                artist_result = await s.execute(
+                    select(Artist).where(Artist.spotify_id == spotify_id)
+                )
+                artist = artist_result.scalar_one()
+                LOGGER.debug(f"Artist '{artist_name}' already exists, using existing record.")
+            
+            await s.commit()
+            await s.refresh(artist)
+            
+        except IntegrityError as e:
+            # Fallback: race condition occurred, fetch existing
+            await s.rollback()
+            LOGGER.debug(f"Race condition detected for artist '{artist_name}', fetching existing.")
+            artist_result = await s.execute(
+                select(Artist).where(Artist.spotify_id == spotify_id)
+            )
+            artist = artist_result.scalar_one()
+
+    LOGGER.info(f"Successfully created/retrieved artist '{artist_name}'.")
+    return artist
+
+async def push_track_metadata(spotify_id: str) -> Song:
+    track = sp.track(spotify_id)
+    LOGGER.debug(f"Adding {track['name']} to Songs with metadata.")
+
+    async with get_session() as s:
+        # Check if song already exists
+        if song := await check_in_table(Song, Song.spotify_id, spotify_id, s):
+            LOGGER.info(f"Song {track['name']} already exists")
+            return song
+
+        # Get or create artists
+        artists = []
+        for artist_data in track["artists"]:
+            # Always try to create - let the database handle duplicates
+            artist = await create_push_artist(artist_data["id"])
+            artists.append(artist)
+
+        # Create song with ON CONFLICT handling
+        try:
+            song = Song(
+                spotify_id=spotify_id, 
+                song_name=track["name"],
+                artists=artists
+            )
+
+            # Add song metadata
+            metadata = []
+            try:
+                if lfm_song := lastfm.get_track(artist=track["artists"][0]["name"], title=track["name"]):
+                    LOGGER.debug(f"Adding LastFM tags to track '{track['name']}'.")
+                    metadata.extend([
+                        SongMetadata(
+                            type=MetadataType.genre, 
+                            value=tag.item.get_name().strip().capitalize(), 
+                            source="LastFM"
+                        ) for tag in lfm_song.get_top_tags()
+                    ])
+            except Exception as e:
+                LOGGER.debug(f"Failed to get LastFM data for {track['name']}: {e}")
+
+            try:
+                if mb_songs := mb.search_recordings(f'artist:"{track["artists"][0]["name"]}" AND recording:"{track["name"]}"'):
+                    LOGGER.debug(f"Adding MusicBrainz tags to track '{track['name']}'.")
+                    if mb_songs.get("recording-list"):
+                        tags_data = mb.get_recording_by_id(
+                            mb_songs["recording-list"][0]["id"],
+                            includes=["tags", "user-tags"]
+                        )
+                        metadata.extend([
+                            SongMetadata(
+                                type=MetadataType.genre, 
+                                value=tag["name"],
+                                source="MusicBrainz"
+                            ) for tag in tags_data["recording"].get("tag-list", [])
+                        ])
+            except Exception as e:
+                LOGGER.debug(f"Failed to get MusicBrainz data for {track['name']}: {e}")
+
+            song.extra_data = metadata
+            s.add(song)
+            await s.commit()
+            await s.refresh(song)
+
+        except IntegrityError:
+            # Song was created by another process
+            await s.rollback()
+            LOGGER.debug(f"Song {track['name']} was created by another process, fetching existing.")
+            song_result = await s.execute(
+                select(Song).where(Song.spotify_id == spotify_id)
+            )
+            song = song_result.scalar_one()
+
+    LOGGER.info(f"Successfully created/retrieved song '{song.song_name}'.")
+    return song
+
+"""
+async def create_push_artist(spotify_id: str) -> Artist:
+    artist_name = sp.artist(spotify_id)["name"]
+    LOGGER.debug(f"Adding {artist_name} to Arists with metadata.")
+
+    async with get_session() as s:
+        artist = Artist(spotify_id=spotify_id, artist_name=artist_name)
+        
         artist.extra_data = []
         if lfm_artist := _sp_to_lastfm(spotify_id):
             LOGGER.debug(f"Adding LastFM tags to artist '{artist_name}'.")
@@ -299,6 +462,7 @@ async def create_push_artist(spotify_id: str) -> Artist:
 
         s.add(artist)
         await s.commit()
+        await s.refresh(artist)
 
     LOGGER.info(f"Successfully created artist '{artist_name}'.")
     return artist
@@ -306,6 +470,7 @@ async def create_push_artist(spotify_id: str) -> Artist:
 # TODO: Decorator for try-except for common DB errors.
 async def push_track_metadata(spotify_id: str) -> Song:
     track = sp.track(spotify_id)
+    LOGGER.debug(f"Adding {track["name"]} to Songs with metadata.")
 
     async with get_session() as s:
         if song := await check_in_table(Song, Song.spotify_id, spotify_id, s):
@@ -317,8 +482,11 @@ async def push_track_metadata(spotify_id: str) -> Song:
             artist = await check_in_table(Artist, Artist.spotify_id, artist_data["id"], s)
 
             if artist is None:
-                LOGGER.debug(f"Creating new artist: {artist["name"]}'.")
-                artist = await create_push_artist(artist["id"])
+                LOGGER.debug(f"Creating new artist: {artist_data["name"]}'.")
+                artist = await create_push_artist(artist_data["id"])
+                await s.refresh(artist)
+            else:
+                LOGGER.debug(f"{artist.artist_name} already in Arists.")
             
             artists.append(artist)
 
@@ -336,14 +504,16 @@ async def push_track_metadata(spotify_id: str) -> Song:
                     for tag in lfm_song.get_top_tags()] 
             )
 
-        if mb_song := mb.search_recordings(f"{track["artists"][0]["name"]} - {track["name"]}"):
+        if mb_song := mb.search_recordings(f'artist:"{track["artists"][0]["name"]}" AND recording:"{track["name"]}"'):
             LOGGER.debug(f"Adding MusicBrainz tags to track '{track["name"]}'.")
+            tags = mb.get_recording_by_id(mb_song["recording-list"][0]["id"],
+                                          includes=["tags", "user-tags"])
+
             song.extra_data.extend(
                 [SongMetadata(type=MetadataType.genre, 
-                              value=tag.item.get_name().lower(), 
+                              value=tag["name"],
                               source="MusicBrainz")
-                    for tag in mb.get_recording_by_id(mb_song["recording-list"][0]["id"],
-                                                      includes=["tags", "user-tags"])]
+                    for tag in tags["recording"].get("tag-list", [])]
             )
 
         s.add(song)
@@ -352,6 +522,7 @@ async def push_track_metadata(spotify_id: str) -> Song:
     LOGGER.info(f"Successfully created song '{song.song_name}'.")
     return song
 
+"""
 
 # LastFM
 # - Track -> tags
@@ -365,5 +536,3 @@ async def push_track_metadata(spotify_id: str) -> Song:
     # artist graph
     # tag graph
         # And somehow relate to our data (so we know which tags/artists/etc to downlaod more music from)
-
-

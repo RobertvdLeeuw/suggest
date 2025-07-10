@@ -25,7 +25,6 @@ class Song(Base):
     spotify_id = Column(String(255), unique=True, nullable=False)
     song_name = Column(String(255), nullable=False)
     # album = Column(String(255), nullable=False)
-    similar_queued = Column(Boolean(), default=False)
 
     artists = relationship("Artist", secondary="song_artist", back_populates="songs")
     extra_data = relationship("SongMetadata", back_populates="song", cascade="all, delete-orphan")
@@ -41,6 +40,7 @@ class Artist(Base):
     artist_id = Column(Integer, primary_key=True, autoincrement=True)
     spotify_id = Column(String(255), unique=True, nullable=False)
     artist_name = Column(String(255), unique=True, nullable=False)
+    similar_queued = Column(Boolean(), default=False)
 
     songs = relationship("Song", secondary="song_artist", back_populates="artists")
     extra_data = relationship("ArtistMetadata", back_populates="artist", cascade="all, delete-orphan")
@@ -69,6 +69,7 @@ class SongMetadata(Base):
     song_id = Column(Integer, ForeignKey('songs.song_id'), nullable=False)
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
     value = Column(String(100))
+    source = Column(String(100))
 
     song = relationship("Song", back_populates="extra_data")
 

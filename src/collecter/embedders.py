@@ -6,18 +6,12 @@ import asyncio
 
 from sqlalchemy import select, delete
 
-from models import EmbeddingJukeMIR, EmbeddingAuditus, QueueJukeMIR, QueueAuditus
+from models import EmbeddingJukeMIR, EmbeddingAuditus, QueueJukeMIR, QueueAuditus, Song
 from db import get_session
 
 from math import floor
 import numpy as np
 
-# LOGGER.debug(f"Importing JukeMIR Module.")
-# import librosa as lr
-# import jukemirlib
-
-# LOGGER.debug(f"Importing Auditus Module.")
-# from auditus.transform import AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
 
 SEGMENT_OVERLAP = 1 
 SEGMENT_LENGTH = 24 
@@ -73,14 +67,12 @@ QueueObject = QueueJukeMIR | QueueAuditus
 class SongQueue:  # Queue with peek and membership testing.
     def __init__(self, name: str, q_type: QueueObject):
         self.name = name
-
         self.q_type = q_type
-
         manager = mp.Manager()
         self.queue = manager.list()
         self.lock = mp.Lock()
         self.condition = mp.Condition(self.lock)
-    
+
     def put(self, item):
         with self.lock:
             if item not in self.queue:
@@ -88,33 +80,34 @@ class SongQueue:  # Queue with peek and membership testing.
                 self.condition.notify()
                 return True
             return False
-    
+
     def get(self):
         with self.condition:
             while len(self.queue) == 0:
                 self.condition.wait()
             return self.queue.pop(0)
-    
-    def remove(self, item):
-        with self.lock:
-            if item in self.queue:
-                self.queue.remove(item)
-    
+
     def __contains__(self, item):
         with self.lock:
             return item in self.queue
 
     def __len__(self):
-        return len(self.queue)
-    
+        with self.lock:
+            return len(self.queue)
+
     def peek(self):
         with self.condition:
             while len(self.queue) == 0:
                 self.condition.wait()
+
             return self.queue[0]
+    
+    def peek_all(self):
+        with self.lock:
+            return list(self.queue)
 
 
-def _jukemir_embed(file_path: str, spotify_id: str) -> list[EmbeddingJukeMIR]:
+def _jukemir_embed(file_path: str, song_id: str) -> list[EmbeddingJukeMIR]:
     _jukemir_load()
 
     LOGGER.debug(f"Starting JukeMIR embedding for file: {file_path}")
@@ -126,33 +119,38 @@ def _jukemir_embed(file_path: str, spotify_id: str) -> list[EmbeddingJukeMIR]:
 
     for i, offset in enumerate(range(0, length, SEGMENT_LENGTH - SEGMENT_OVERLAP), start=1):
         segment_duration = min(SEGMENT_LENGTH, length - offset)
-        LOGGER.debug(f"Processing segment {i} at offset {offset}s, duration {segment_duration}s")
+        LOGGER.debug(f"Processing segment {i} at offset {offset}s/{length}s of {file_path}, duration {segment_duration}s")
 
         audio = jukemirlib.load_audio(file_path,
                                       offset=offset,
                                       duration=segment_duration)
         
         emb = jukemirlib.extract(audio, layers=[LAYER], meanpool=True)[LAYER]
-        embeddings.append(EmbeddingJukeMIR(chunk_id=i, embedding=emb, song_id=spotify_id))
+        embeddings.append(EmbeddingJukeMIR(chunk_id=i, embedding=emb, song_id=song_id))
 
     LOGGER.info(f"JukeMIR embedding of '{file_path}' successful.")
     return embeddings
 
 
-def _auditus_embed(file_path: str, spotify_id: str) -> list[EmbeddingAuditus]:
+def _auditus_embed(file_path: str, song_id: str) -> list[EmbeddingAuditus]:
     _auditus_load()
 
     LOGGER.debug(f"Starting Auditus embedding for file: {file_path}")
 
-    audio = AudioLoader.load_audio(file_path, sr=SAMPLE_RATE)
-    audio = AudioArray(a=np.mean(audio, axis=1), sr=SAMPLE_RATE)  # Stereo -> Mono
+    # audio = AudioLoader.load_audio(file_path, sr=SAMPLE_RATE)
+    audio = AudioLoader.load_audio(file_path)
+    audio = AudioArray(a=np.mean(audio, axis=1), sr=audio.sr)  # Stereo -> Mono
+    audio = Resampling(target_sr=SAMPLE_RATE)(audio)
+
+    length = floor(len(audio.a)/SAMPLE_RATE)
+
     embeddings = []
-    for i, offset in enumerate(range(0, floor(len(audio.a)/SAMPLE_RATE), 
+    for i, offset in enumerate(range(0, length, 
                                      SEGMENT_LENGTH - SEGMENT_OVERLAP), 
                                start=1):  # Seconds
         
         segment_duration = min(SEGMENT_LENGTH, floor(len(audio.a)/SAMPLE_RATE - offset))
-        LOGGER.debug(f"Processing segment {i} at offset {offset}s, duration {segment_duration}s")
+        LOGGER.debug(f"Processing segment {i} at offset {offset}s/{length}s of {file_path}, duration {segment_duration}s")
 
         offset_sr = offset * SAMPLE_RATE
 
@@ -162,33 +160,45 @@ def _auditus_embed(file_path: str, spotify_id: str) -> list[EmbeddingAuditus]:
         emb = AudioEmbedding(return_tensors="pt")(audio_chunk)
 
         emb = Pooling(pooling="mean")(emb)
-        embeddings.append(EmbeddingAuditus(chunk_id=i, embedding=emb.numpy(), song_id=spotify_id))
+        embeddings.append(EmbeddingAuditus(chunk_id=i, embedding=emb.numpy(), song_id=song_id))
         
     LOGGER.info(f"Auditus embedding of '{file_path}' successful.")
     return embeddings
 
 async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
     LOGGER.info(f"{name} embedding loop started.")
+
     while True:
+        song_file = None
+        spotify_id = None
+
         try:
             song_file, spotify_id = queue.peek()
-            embeddings = embed_func(song_file)
             
             async with get_session() as s:
+                result = await s.execute(select(Song).where(Song.spotify_id == spotify_id))
+                item = result.scalar_one_or_none()
+
+                assert item is not None, f"About to embed using {name}, but no Song matching {spotify_id} found."
+
+                embeddings = embed_func(song_file, item.song_id)
                 s.add_all(embeddings)
 
                 # Remove from queue
                 result = await s.execute(delete(queue.q_type)
-                                         .where(q.q_type.c.spotify_id == spotify_id))
+                                         .where(queue.q_type.spotify_id == spotify_id))
                 
                 await s.commit()
+                # await s.refresh(embeddings)
                 LOGGER.debug(f"Pushed {name} embeddings of '{song_file}' to DB.")
 
             LOGGER.info(f"Embedding '{song_file}' using {name} successful.")
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except:
             LOGGER.warning(f"Embedding '{song_file}' using {name} failed: {traceback.format_exc()}")
-        finally:
-            queue.get()  # Only remove from queue once fully processed.
+
+        queue.get()
 
 def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
     """Synchronous wrapper that runs the async embed_wrapper in an event loop"""
@@ -199,6 +209,7 @@ def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
         loop.run_until_complete(_async_embed_wrapper(embed_func, name, queue))
     except KeyboardInterrupt:
         LOGGER.info(f"Process {name} interrupted")
+        sys.exit(0)
     except Exception as e:
         LOGGER.error(f"Process {name} failed: {e}")
     finally:
