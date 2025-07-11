@@ -2,30 +2,37 @@ Metadata-Version: 2.4
 Name: music-embed
 Version: 0.1.0
 Summary: Add your description here
-Requires-Python: ==3.12
+Requires-Python: <3.13,>=3.12
 Description-Content-Type: text/markdown
 Requires-Dist: apscheduler>=3.11.0
-Requires-Dist: auditus>=0.0.6
-Requires-Dist: ipympl>=0.9.7
-Requires-Dist: jukemirlib
-Requires-Dist: marimo>=0.13.15
-Requires-Dist: matplotlib>=3.10.3
-Requires-Dist: musicbrainzngs>=0.7.1
-Requires-Dist: pandas>=2.2.3
-Requires-Dist: pgvector>=0.4.1
-Requires-Dist: plotly>=6.1.2
-Requires-Dist: psycopg2-binary>=2.9.10
-Requires-Dist: pylast>=5.5.0
 Requires-Dist: python-dotenv>=1.1.1
-Requires-Dist: scikit-learn>=1.6.1
-Requires-Dist: seaborn>=0.13.2
 Requires-Dist: setuptools>=80.9.0
-Requires-Dist: spotdl>=4.2.11
-Requires-Dist: spotipy>=2.25.1
 Requires-Dist: sqlalchemy>=2.0.41
-Requires-Dist: torch>=2.6.0
-Requires-Dist: umap-learn>=0.5.7
 Requires-Dist: xmltodict>=0.14.2
+Requires-Dist: asyncpg>=0.30.0
+Requires-Dist: psycopg2-binary>=2.9.10
+Requires-Dist: pgvector>=0.4.1
+Provides-Extra: db
+Requires-Dist: asyncpg>=0.30.0; extra == "db"
+Requires-Dist: psycopg2-binary>=2.9.10; extra == "db"
+Requires-Dist: pgvector>=0.4.1; extra == "db"
+Provides-Extra: collecter
+Requires-Dist: nest-asyncio>=1.6.0; extra == "collecter"
+Requires-Dist: pylast>=5.5.0; extra == "collecter"
+Requires-Dist: spotdl>=4.2.11; extra == "collecter"
+Requires-Dist: spotipy>=2.25.1; extra == "collecter"
+Requires-Dist: musicbrainzngs>=0.7.1; extra == "collecter"
+Requires-Dist: jukemirlib; extra == "collecter"
+Requires-Dist: auditus>=0.0.6; extra == "collecter"
+Requires-Dist: umap-learn>=0.5.7; extra == "collecter"
+Provides-Extra: suggester
+Requires-Dist: torch>=2.6.0; extra == "suggester"
+Requires-Dist: scikit-learn>=1.6.1; extra == "suggester"
+Provides-Extra: frontend
+Requires-Dist: ipympl>=0.9.7; extra == "frontend"
+Requires-Dist: marimo>=0.13.15; extra == "frontend"
+Requires-Dist: matplotlib>=3.10.3; extra == "frontend"
+Requires-Dist: seaborn>=0.13.2; extra == "frontend"
 
 # Suggest: An Embedding and RL-Based Music Recommendation System
 <img src="poster.png" alt="Poster" width="800"/>

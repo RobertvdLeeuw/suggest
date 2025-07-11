@@ -181,6 +181,7 @@ async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue)
 
                 assert item is not None, f"About to embed using {name}, but no Song matching {spotify_id} found."
 
+                LOGGER.debug(f"Start embed, {name}, {item}.")
                 embeddings = embed_func(song_file, item.song_id)
                 s.add_all(embeddings)
 
@@ -204,7 +205,7 @@ def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
     """Synchronous wrapper that runs the async embed_wrapper in an event loop"""
     try:
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # asyncio.set_event_loop(loop)
         
         loop.run_until_complete(_async_embed_wrapper(embed_func, name, queue))
     except KeyboardInterrupt:

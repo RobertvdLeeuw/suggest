@@ -43,7 +43,13 @@
       # Uv2nix treats all uv projects as workspace projects.
       workspace = uv2nix.lib.workspace.loadWorkspace {
         workspaceRoot = ./.;
-        config.deps = "all";
+        config.deps = {
+          default = true;
+          db = true;
+          collecter = true;
+          suggester = true;
+          frontend = true;
+        };
       };  # Loading in pyproject and project data.
 
       # Create package overlay from workspace.
@@ -87,6 +93,34 @@
         jaconv = _prev.jaconv.overrideAttrs (old: {
           nativeBuildInputs = (old.nativeBuildInputs or []) ++ 
             _final.resolveBuildSystem { setuptools = []; };
+        });
+
+        hatchling = _prev.hatchling.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++
+            _final.resolveBuildSystem { 
+              setuptools = []; 
+              wheel = [];
+            };
+        });
+
+        hatch-vcs = _prev.hatch-vcs.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++
+            _final.resolveBuildSystem { 
+              hatchling = [];
+              hatch-vcs = [];  # Often needed with hatchling
+              setuptools = [];  # Fallback
+            };
+        });
+
+        spotdl-lean = _prev.spotdl-lean.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++
+            _final.resolveBuildSystem {
+              setuptools = [];
+              wheel = [];
+            };
+          buildInputs = (old.buildInputs or []) ++ [
+            # Add any system dependencies if needed
+          ];
         });
 
       };

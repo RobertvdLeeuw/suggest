@@ -19,7 +19,6 @@ dependencies = [
     "asyncpg>=0.30.0",
     "psycopg2-binary>=2.9.10",
     "pgvector>=0.4.1",
-    "nest-asyncio>=1.6.0",
 ]
 
 [project.optional-dependencies]
@@ -29,6 +28,7 @@ db = [
     "pgvector>=0.4.1",
 ]
 collecter = [
+    "nest-asyncio>=1.6.0",
     "pylast>=5.5.0",
     "spotdl>=4.2.11",
     "spotipy>=2.25.1",
@@ -57,6 +57,7 @@ frontend = [
 torch = [
   { index = "pytorch-cpu" },
 ]
+spotdl = { git = "https://github.com/RobertvdLeeuw/spotdl-lean.git" }
 jukemirlib = { git = "https://github.com/rodrigo-castellon/jukemirlib.git" }
 # tensorflow-rocm = { url = "https://repo.radeon.com/rocm/manylinux/rocm-rel-6.3.3/tensorflow_rocm-2.16.2-cp312-cp312-manylinux_2_28_x86_64.whl" }
 

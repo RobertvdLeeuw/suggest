@@ -29,7 +29,7 @@ async def main():
         song_queues = start_processes()
         
         scheduler = AsyncIOScheduler()
-        scheduler.add_job(clean_downloads,'interval', hours=1, args=(song_queues,))
+        scheduler.add_job(clean_downloads, 'interval', hours=1, args=(song_queues,))
         scheduler.start()
 
         # await _add_to_db_queue(_get_sp_album_tracks("2zQeigA4bFAlTqQqBiVe6Y"))

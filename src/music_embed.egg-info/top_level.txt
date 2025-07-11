@@ -1,5 +1,6 @@
 ai
-collection
+ai_models
+collecter
 db
 logger
 metrics
@@ -8,3 +9,7 @@ objects
 plots
 quickstart
 reduce
+sp_tokens
+spotdl_patch
+spotdl_test
+test_mb
