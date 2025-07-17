@@ -41,7 +41,12 @@ mb.set_useragent("Suggest: Music Recommender", "1.0", contact=os.environ["EMAIL_
 mb.set_rate_limit()
 mb.auth(os.environ["MB_USERNAME"], os.environ["MB_PW"])
 
-from models import QueueJukeMIR, QueueAuditus, Song, SongMetadata, Artist, ArtistMetadata, MetadataType
+from models import (
+        QueueJukeMIR, QueueAuditus,
+        Song, SongMetadata, 
+        Artist, ArtistMetadata, MetadataType, 
+        ListenChunk, Listen
+)
 from db import get_session
 from sqlalchemy import select, exists
 from sqlalchemy.dialects.postgresql import insert
@@ -452,103 +457,158 @@ async def _add_to_db_queue(spotify_track_ids: list[str]):
             await s.commit()
     LOGGER.info(f"Added {len(new_tracks)} queue items.")
 
-async def _add_song_listens(user_id: int, tracks: list[dict]):
-    LOGGER.info(f"Adding user {len(spotify_ids)} listens to user {user_id}.")
-    listens = []
 
+
+async def add_song_listens(user_id: int, tracks: list[dict]):
+    """Add song listens with their chunks."""
+    LOGGER.info(f"Adding {len(tracks)} listens to user {user_id}.")
+    
     async with get_session() as s:
         for track in tracks:
+            # Check required fields
             missing_required = [required for required in ["spotify_id", "ms_played"] 
                                 if required not in track]
             if missing_required:
                 LOGGER.warning(f"Required fields '{"', '".join(missing_required)}' " \
                                f"missing in listen entry: {track}")
                 continue
-                    
+            
+            # Get or create the song
             song = await push_track_metadata(track["spotify_id"])
             
-            listens.append({"user_id": user_id,
-                            "song_id": song.song_id,
-                            "reason_start": track.get("reason_start"),
-                            "reason_end": track.get("reason_end"),
-                            "ms_played": track["ms_played"],
-                            })
+            # Create the liten entry
+            new_listen = Listen(
+                user_id=user_id,
+                song_id=song.song_id,
+                reason_start=track.get("reason_start"), 
+                reason_end=track.get("reason_end"),
+                listened_at=track.get("listened_at", datetime.now()),
+                ms_played=track["ms_played"]
+            )
             
-    LOGGER.debug(f"Created {len(listens)} listen entries, pushing now.")
+            s.add(new_listen)
+            
+            # Need to flush to get the listen_id for chunks
+            await s.flush()
+            
+            if "chunks" in track and track["chunks"]:
+                for chunk_data in track["chunks"]:
+                    chunk = ListenChunk(
+                        listen_id=new_listen.listen_id,
+                        from_ms=chunk_data["from_ms"],
+                        to_ms=chunk_data["to_ms"]
+                    )
+                    s.add(chunk)
+        
+        try:
+            await s.commit()
+            LOGGER.info(f"Successfully added {len(tracks)} listen entries with chunks.")
+        except Exception as e:
+            await s.rollback()
+            LOGGER.error(f"Error adding listens: {e}")
+            raise
 
-    new_listens_stmt = insert(Listen).values(listens)
-    new_listens_stmt.on_conflict_do_nothing(constraint="uq_listen")
-    await s.execute(new_listens_stmt)
-
-    LOGGER.info(f"Successfully pushed {len(listens)} listen entries, pushing now.")
-
-
-async def add_history_listens(user_id: str, history: list[dict]):
-    history = [{**listen, "spotify_id": listen["spotify_track_uri"].split(":")[-1]}
-               for listen in history]
+async def _get_user(spotify_id: str) -> User | None:
+    async with get_session() as s:
+        result = await session.execute(select(User).where(User.spotify_id == spotify_id).limit(1))
+        item = result.scalar_one_or_none()
     
-    await _add_song_listens(user_id, history)
+    if item is None:
+        LOGGER.warning(f"User '{spotify_id}' not found.")
+
+    return item
+        
+
+async def add_history_listens(user_spotify_id: str, history: list[dict]):
+    history = [{**listen,
+                "source": "history",
+                "spotify_id": listen["spotify_track_uri"].split(":")[-1],
+                "listened_at": listen["ts"]
+                } for listen in history]
+
+    user = await _get_user(user_spotify_id)
+    await _add_song_listens(user.user_id, history)
     await _add_to_db_queue([listen["spotify_id"] for listen in history])
 
-SLEEP_TIME = 2
-async def add_recent_listen_loop(user_id: str):
+
+SLEEP_TIME_S = 2
+async def add_recent_listen_loop(user_spotify_id: str):
     current_listen = None
     current_reason_start = "unknown"
 
     next_in_queue_id = None
 
+    ms_played = 0
+
+    listen_chunks = []
+    latest_chunk_start = 0
+
+    user = await _get_user(user_spotify_id)
+
     while True:
+        asyncio.sleep(SLEEP_TIME_S)
+        ms_played += SLEEP_TIME_S * 1000
         new_listen = sp.current_playback()
         
+        near_start = current_listen["item"]["duration_ms"] * 0.1
         if current_listen["item"]["id"] == new_listen["item"]["id"]:
-            if (new_listen["progress_ms"] <= current_listen["progress_ms"]) and
-                new_listen["progress_ms"] < SLEEP_TIME * 2):
-                await _add_song_listens(user_id, [{"spotify_id": current_listen["item"]["id"],
-                                                   "ms_played": current_listen["progress_ms"],
-                                                   "reason_end": "backbtn"}])
+            if new_listen["progress_ms"] <= current_listen["progress_ms"]):
+                listen_chunks.append({"from_ms": latest_chunk_start, 
+                                      "to_ms": current_listen["progress_ms"]})
+                latest_chunk_start = new_listen["progress_ms"]
+
+                if new_listen["progress_ms"] < near_start:  # Restart
+                    await _add_song_listens(user_id, [{"spotify_id": current_listen["item"]["id"],
+                                                       "source": "live",
+                                                       "ms_played": ms_played,
+                                                       "reason_start": current_reason_start,
+                                                       "reason_end": "restarted"
+                                                       "chunks": listen_chunks}])
+                    current_reason_start = "restarted"
+                    listen_chunks = []
+                    latest_chunk_start = 0
+            elif new_listen["progress_ms"] - current_listen["progress_ms"] > SLEEP_TIME_S * 2:
+                listen_chunks.append({"from_ms": latest_chunk_start, 
+                                      "to_ms": current_listen["progress_ms"]})
+                latest_chunk_start = new_listen["progress_ms"]
 
             current_listen = new_listen
             continue
 
-
-        if current_listen["item"]["duration_ms"] - current_listen["progress_ms"] < SLEEP_TIME * 2:
-            current_listen["progress_ms"] = current_listen["item"]["duration_ms"]
-
+        # New song, process old.
+        near_end = current_listen["item"]["duration_ms"] * 0.75
+        # TODO: Better way to model trackdone (messy with our vs spotify ms played).
+        if ms_played >= near_end:  
             reason_end = "trackdone"
             new_reason_start = "trackdone"
+        elif new_listen["item"]["id"] == next_in_queue_id:
+            reason_end = "skipped"
+            new_reason_start = "skipped"
         elif not current_listen["is_playing"]:
-            reason_end = "endplay"
-            new_reason_start = "unknown"
-        elif new_listen["item"]["id"] = next_in_queue_id:
-            reason_end = "fwdbtn"
-            new_reason_start = "fwdbtn"
+            reason_end = "skipped" if current_listen["is_playing"] else "paused"
+            new_reason_start = "selected"
         else:
             reason_end = "unknown"
             new_reason_start = "unknown"
 
         q = sp.queue()["queue"]
-
         if len(q) >= 1:
             next_in_queue_id = q[0]["id"]
 
-        await _add_song_listens(user_id, [{"spotify_id": current_listen["item"]["id"],
-                                           "ms_played": current_listen["progress_ms"],
-                                           "reason_end": current_reason_start,
-                                           "reason_end": reason_end}])
 
+        listen_chunks.append({"from_ms": latest_chunk_start, 
+                              "to_ms": current_listen["progress_ms"]})
+        await _add_song_listens(user.user_id, [{"spotify_id": current_listen["item"]["id"],
+                                                "source": "live",
+                                                "ms_played": ms_played,
+                                                "reason_start": current_reason_start,
+                                                "reason_end": reason_end,
+                                                "chunks": listen_chunks}])
+
+        current_listen = new_listen
         current_reason_start = new_reason_start
+        latest_chunk_start = 0
+        listen_chunks = []
+        latest_chunk_start = 0
+        ms_played = 0 
 
-        asyncio.sleep(SLEEP_TIME)
-
-# LastFM
-# - Track -> tags
-# Track -> similar tracks
-# - Artist -> tags
-# - Artist -> similar artists
-# Tag -> description (cool for some future feature)
-# Tag -> similar tags
-
-# WE CAN BUILD (relational):
-    # artist graph
-    # tag graph
-        # And somehow relate to our data (so we know which tags/artists/etc to downlaod more music from)

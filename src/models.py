@@ -81,27 +81,21 @@ class User(Base):
     __tablename__ = 'users'
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
+    spotify_id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(255))
 
 class StartReasonType(Enum):
-    appload = "appload"
-    backbtn = "backbtn"
-    clickrow = "clickrow"
-    fwdbtn = "fwdbtn"
-    playbtn = "playbtn"
-    remote = "remote"
+    selected = "selected"
+    skipped = "skipped"
     trackdone = "trackdone"
-    trackerror = "trackerror"
+    restarted = "restarted"
     unknown = "unknown"
 
 class EndReasonType(Enum):
-    backbtn = "backbtn"
-    clickrow = "clickrow"
-    fwdbtn = "fwdbtn"
-    playbtn = "playbtn"
-    remote = "remote"
+    skipped = "skipped"
     trackdone = "trackdone"
-    trackerror = "trackerror"
+    restarted = "restarted"
+    paused = "paused"
     unknown = "unknown"
 
 
@@ -131,10 +125,25 @@ class Listen(Base):
                         default=EndReasonType.unknown, 
                         nullable=False)
 
+    source = Column(String(64))
+
+    chunks = relationship("ListenChunk", back_populates="listen", cascade="all, delete-orphan")
+
     # Prevent duplicate listens
     __table_args__ = (
         UniqueConstraint('user_id', 'song_id', 'listened_at', name='uq_listen'),
     )
+
+class ListenChunk(Base):
+    __tablename__ = 'listen_chunks'
+
+    chunk_id = Column(Integer, primary_key=True, autoincrement=True)  # Add primary key
+    listen_id = Column(Integer, ForeignKey('listens.listen_id'), primary_key=True)
+
+    from_ms = Column(Integer)
+    to_ms = Column(Integer)
+    
+    listen = relationship("Listen", back_populates="chunks")
 
 class Model(Base):
     __tablename__ = 'models'
