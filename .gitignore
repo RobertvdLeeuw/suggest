@@ -5,6 +5,7 @@ data/songs/
 data/spotify.json
 downloads/
 
+src/music_embed.egg-info/
 spotify_data_isrc.json
 
 # General

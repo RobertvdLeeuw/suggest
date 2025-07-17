@@ -13,7 +13,7 @@ import os
 
 from embedders import start_processes, end_processes
 from downloader import start_download_loop, clean_downloads
-from metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue
+from metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue, add_recent_listen_loop
 
 
 async def main():
@@ -35,7 +35,8 @@ async def main():
         # await _add_to_db_queue(_get_sp_album_tracks("2zQeigA4bFAlTqQqBiVe6Y"))
         # await queue_sp_user()
 
-        await start_download_loop(song_queues)
+        await asyncio.gather(start_download_loop(song_queues),
+                             add_recent_listen_loop())
     except Exception as e:
         LOGGER.error(f"Main loop error: {traceback.format_exc()}")
     finally:

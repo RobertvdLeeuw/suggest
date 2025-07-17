@@ -9,7 +9,7 @@ logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
 logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
 logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 
-LOG_PATH = "log.log"
+LOG_PATH = "logs/log.log"
 with open(LOG_PATH, 'w'):
     pass
 

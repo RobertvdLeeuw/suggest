@@ -45,6 +45,8 @@ async def init_db():
 async def setup_tables():
     await init_db()
 
+    await conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
+
     async with ENGINE.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
@@ -66,6 +68,10 @@ async def setup():
 
 if __name__ == "__main__":
     LOGGER.info("Setting up tables.")
+
+    if not input("This will remove all tables and data from the DB. Are you sure?").lower().startswith("y"):
+        exit()
+
     asyncio.run(setup_tables())
 
 

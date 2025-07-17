@@ -1,6 +1,7 @@
 from sqlalchemy import (
     Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean,
     Enum as SQLEnum,
+    UniqueConstraint
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -28,6 +29,9 @@ class Song(Base):
 
     artists = relationship("Artist", secondary="song_artist", back_populates="songs")
     extra_data = relationship("SongMetadata", back_populates="song", cascade="all, delete-orphan")
+
+    # So we can remove oldests songs in case of storage full.
+    created_at = Column(DateTime, default=func.now())  
 
     jukemir_embeddings = relationship("EmbeddingJukeMIR", back_populates="song", cascade="all, delete-orphan")
     jukemir_pca_embeddings = relationship("EmbeddingJukeMIRPCA250", back_populates="song", cascade="all, delete-orphan")
@@ -79,6 +83,59 @@ class User(Base):
     user_id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(255))
 
+class StartReasonType(Enum):
+    appload = "appload"
+    backbtn = "backbtn"
+    clickrow = "clickrow"
+    fwdbtn = "fwdbtn"
+    playbtn = "playbtn"
+    remote = "remote"
+    trackdone = "trackdone"
+    trackerror = "trackerror"
+    unknown = "unknown"
+
+class EndReasonType(Enum):
+    backbtn = "backbtn"
+    clickrow = "clickrow"
+    fwdbtn = "fwdbtn"
+    playbtn = "playbtn"
+    remote = "remote"
+    trackdone = "trackdone"
+    trackerror = "trackerror"
+    unknown = "unknown"
+
+
+class Listen(Base):
+    __tablename__ = "listens"
+
+    listen_id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    user_id = Column(Integer, 
+                     ForeignKey('users.user_id', 
+                                onupdate='CASCADE', 
+                                ondelete='CASCADE'), 
+                     nullable=False)
+    song_id = Column(Integer, 
+                     ForeignKey('songs.song_id', 
+                                onupdate='CASCADE', 
+                                ondelete='CASCADE'), 
+                     nullable=False)
+    
+    listened_at = Column(DateTime, default=func.now())
+    ms_played = Column(Integer)
+
+    reason_start = Column(SQLEnum(StartReasonType), 
+                          default=StartReasonType.unknown, 
+                          nullable=False)
+    reason_end = Column(SQLEnum(EndReasonType), 
+                        default=EndReasonType.unknown, 
+                        nullable=False)
+
+    # Prevent duplicate listens
+    __table_args__ = (
+        UniqueConstraint('user_id', 'song_id', 'listened_at', name='uq_listen'),
+    )
+
 class Model(Base):
     __tablename__ = 'models'
 
@@ -121,8 +178,6 @@ class QueueAuditus(Base):
     spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
     created_at = Column(DateTime, default=func.now())
     
-
-
 class EmbeddingJukeMIR(Base):
     __tablename__ = 'embeddings_jukemir'
 

@@ -11,7 +11,9 @@ CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
 REDIRECT_URI = "http://127.0.0.1:8080/callback"
 SCOPES = ['user-library-read',
           'playlist-read-private',
-          'playlist-read-collaborative']
+          'playlist-read-collaborative',
+          'user-read-currently-playing',
+          'user-read-playback-state']
 
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
