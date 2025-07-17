@@ -84,18 +84,11 @@ class User(Base):
     spotify_id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(255))
 
-class StartReasonType(Enum):
+class StartEndReason(Enum):
     selected = "selected"
     skipped = "skipped"
     trackdone = "trackdone"
     restarted = "restarted"
-    unknown = "unknown"
-
-class EndReasonType(Enum):
-    skipped = "skipped"
-    trackdone = "trackdone"
-    restarted = "restarted"
-    paused = "paused"
     unknown = "unknown"
 
 
@@ -118,11 +111,11 @@ class Listen(Base):
     listened_at = Column(DateTime, default=func.now())
     ms_played = Column(Integer)
 
-    reason_start = Column(SQLEnum(StartReasonType), 
-                          default=StartReasonType.unknown, 
+    reason_start = Column(SQLEnum(StartEndReason), 
+                          default=StartEndReason.unknown, 
                           nullable=False)
-    reason_end = Column(SQLEnum(EndReasonType), 
-                        default=EndReasonType.unknown, 
+    reason_end = Column(SQLEnum(StartEndReason), 
+                        default=StartEndReason.unknown, 
                         nullable=False)
 
     source = Column(String(64))

@@ -519,11 +519,25 @@ async def _get_user(spotify_id: str) -> User | None:
     return item
         
 
+from collections import defaultdict
+END_REASON_MAP = defaultdict(lambda: "unknown", {"clickrow": "selected",
+                                                 "fwdbtn": "selected",
+                                                 "trackdone": "trackdone",
+                                                 "backbtn": "restarted"})
+
+
+START_REASON_MAP = defaultdict(lambda: "unknown", {"clickrow": "skipped",
+                                                   "fwdbtn": "skipped",
+                                                   "trackdone": "trackdone",
+                                                   "backbtn": "restarted"})
+
 async def add_history_listens(user_spotify_id: str, history: list[dict]):
     history = [{**listen,
                 "source": "history",
                 "spotify_id": listen["spotify_track_uri"].split(":")[-1],
-                "listened_at": listen["ts"]
+                "listened_at": listen["ts"],
+                "reason_start": START_REASON_MAP[listen["reason_start"]],
+                "reason_end": END_REASON_MAP[listen["reason_end"]],
                 } for listen in history]
 
     user = await _get_user(user_spotify_id)
@@ -552,7 +566,7 @@ async def add_recent_listen_loop(user_spotify_id: str):
         
         near_start = current_listen["item"]["duration_ms"] * 0.1
         if current_listen["item"]["id"] == new_listen["item"]["id"]:
-            if new_listen["progress_ms"] <= current_listen["progress_ms"]):
+            if new_listen["progress_ms"] <= current_listen["progress_ms"]:
                 listen_chunks.append({"from_ms": latest_chunk_start, 
                                       "to_ms": current_listen["progress_ms"]})
                 latest_chunk_start = new_listen["progress_ms"]
@@ -562,7 +576,7 @@ async def add_recent_listen_loop(user_spotify_id: str):
                                                        "source": "live",
                                                        "ms_played": ms_played,
                                                        "reason_start": current_reason_start,
-                                                       "reason_end": "restarted"
+                                                       "reason_end": "restarted",
                                                        "chunks": listen_chunks}])
                     current_reason_start = "restarted"
                     listen_chunks = []

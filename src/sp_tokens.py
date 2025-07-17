@@ -8,7 +8,7 @@ load_dotenv()
 # Your Spotify app credentials
 CLIENT_ID = os.environ["SPOTIFY_CLIENT_ID"]
 CLIENT_SECRET = os.environ["SPOTIFY_CLIENT_SECRET"]
-REDIRECT_URI = "http://127.0.0.1:8080/callback"
+REDIRECT_URI = "http://localhost:8080/callback"
 SCOPES = ['user-library-read',
           'playlist-read-private',
           'playlist-read-collaborative',
