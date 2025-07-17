@@ -115,6 +115,7 @@
         spotdl-lean = _prev.spotdl-lean.overrideAttrs (old: {
           nativeBuildInputs = (old.nativeBuildInputs or []) ++
             _final.resolveBuildSystem {
+              poetry = [];  
               setuptools = [];
               wheel = [];
             };
