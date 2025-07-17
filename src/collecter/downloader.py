@@ -46,7 +46,8 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         downloader_settings=DownloaderOptions(format="wav", 
                                               simple_tui=False,
                                               print_download_errors=False,
-                                              output=DOWNLOAD_LOC)
+                                              output=DOWNLOAD_LOC),
+        loop=asyncio.get_event_loop()
     )
     song = spotdl.search(["https://open.spotify.com/track/" + spotify_id])[0]
 

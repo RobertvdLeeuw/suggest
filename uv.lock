@@ -17,7 +17,7 @@ wheels = [
 
 [[package]]
 name = "accelerate"
-version = "1.8.1"
+version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
@@ -29,9 +29,9 @@ dependencies = [
     { name = "torch", version = "2.6.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
     { name = "torch", version = "2.6.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bd/c2/b9e33ad13232606dded4c546e654fb06a15f1dbcbd95d81c9f9dd3ccc771/accelerate-1.8.1.tar.gz", hash = "sha256:f60df931671bc4e75077b852990469d4991ce8bd3a58e72375c3c95132034db9", size = 380872, upload-time = "2025-06-20T15:36:14.618Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/25/969456a95a90ed38f73f68d0f0915bdf1d76145d05054c59ad587b171150/accelerate-1.9.0.tar.gz", hash = "sha256:0e8c61f81af7bf37195b6175a545ed292617dd90563c88f49020aea5b6a0b47f", size = 383234, upload-time = "2025-07-16T16:24:54.526Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/d9/e044c9d42d8ad9afa96533b46ecc9b7aea893d362b3c52bd78fb9fe4d7b3/accelerate-1.8.1-py3-none-any.whl", hash = "sha256:c47b8994498875a2b1286e945bd4d20e476956056c7941d512334f4eb44ff991", size = 365338, upload-time = "2025-06-20T15:36:12.71Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/1c/a17fb513aeb684fb83bef5f395910f53103ab30308bbdd77fd66d6698c46/accelerate-1.9.0-py3-none-any.whl", hash = "sha256:c24739a97ade1d54af4549a65f8b6b046adc87e2b3e4d6c66516e32c53d5a8f1", size = 367073, upload-time = "2025-07-16T16:24:52.957Z" },
 ]
 
 [[package]]
@@ -520,28 +520,28 @@ wheels = [
 
 [[package]]
 name = "fonttools"
-version = "4.58.5"
+version = "4.59.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/52/97/5735503e58d3816b0989955ef9b2df07e4c99b246469bd8b3823a14095da/fonttools-4.58.5.tar.gz", hash = "sha256:b2a35b0a19f1837284b3a23dd64fd7761b8911d50911ecd2bdbaf5b2d1b5df9c", size = 3526243, upload-time = "2025-07-03T14:04:47.736Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/27/ec3c723bfdf86f34c5c82bf6305df3e0f0d8ea798d2d3a7cb0c0a866d286/fonttools-4.59.0.tar.gz", hash = "sha256:be392ec3529e2f57faa28709d60723a763904f71a2b63aabe14fee6648fe3b14", size = 3532521, upload-time = "2025-07-16T12:04:54.613Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d6/68/66b498ee66f3e7e92fd68476c2509508082b7f57d68c0cdb4b8573f44331/fonttools-4.58.5-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:c3af3fefaafb570a03051a0d6899b8374dcf8e6a4560e42575843aef33bdbad6", size = 2754751, upload-time = "2025-07-03T14:03:52.976Z" },
-    { url = "https://files.pythonhosted.org/packages/f1/1e/edbc14b79290980c3944a1f43098624bc8965f534964aa03d52041f24cb4/fonttools-4.58.5-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:688137789dbd44e8757ad77b49a771539d8069195ffa9a8bcf18176e90bbd86d", size = 2322342, upload-time = "2025-07-03T14:03:54.957Z" },
-    { url = "https://files.pythonhosted.org/packages/c1/d7/3c87cf147185d91c2e946460a5cf68c236427b4a23ab96793ccb7d8017c9/fonttools-4.58.5-cp312-cp312-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:2af65836cf84cd7cb882d0b353bdc73643a497ce23b7414c26499bb8128ca1af", size = 4897011, upload-time = "2025-07-03T14:03:56.829Z" },
-    { url = "https://files.pythonhosted.org/packages/a0/d6/fbb44cc85d4195fe54356658bd9f934328b4f74ae14addd90b4b5558b5c9/fonttools-4.58.5-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:d2d79cfeb456bf438cb9fb87437634d4d6f228f27572ca5c5355e58472d5519d", size = 4942291, upload-time = "2025-07-03T14:03:59.204Z" },
-    { url = "https://files.pythonhosted.org/packages/4d/c8/453f82e21aedf25cdc2ae619c03a73512398cec9bd8b6c3b1c571e0b6632/fonttools-4.58.5-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:0feac9dda9a48a7a342a593f35d50a5cee2dbd27a03a4c4a5192834a4853b204", size = 4886824, upload-time = "2025-07-03T14:04:01.517Z" },
-    { url = "https://files.pythonhosted.org/packages/40/54/e9190001b8e22d123f78925b2f508c866d9d18531694b979277ad45d59b0/fonttools-4.58.5-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:36555230e168511e83ad8637232268649634b8dfff6ef58f46e1ebc057a041ad", size = 5038510, upload-time = "2025-07-03T14:04:03.917Z" },
-    { url = "https://files.pythonhosted.org/packages/cf/9c/07cdad4774841a6304aabae939f8cbb9538cb1d8e97f5016b334da98e73a/fonttools-4.58.5-cp312-cp312-win32.whl", hash = "sha256:26ec05319353842d127bd02516eacb25b97ca83966e40e9ad6fab85cab0576f4", size = 2188459, upload-time = "2025-07-03T14:04:06.103Z" },
-    { url = "https://files.pythonhosted.org/packages/0e/4d/1eaaad22781d55f49d1b184563842172aeb6a4fe53c029e503be81114314/fonttools-4.58.5-cp312-cp312-win_amd64.whl", hash = "sha256:778a632e538f82c1920579c0c01566a8f83dc24470c96efbf2fbac698907f569", size = 2236565, upload-time = "2025-07-03T14:04:08.27Z" },
-    { url = "https://files.pythonhosted.org/packages/d7/d4/1d85a1996b6188cd2713230e002d79a6f3a289bb17cef600cba385848b72/fonttools-4.58.5-py3-none-any.whl", hash = "sha256:e48a487ed24d9b611c5c4b25db1e50e69e9854ca2670e39a3486ffcd98863ec4", size = 1115318, upload-time = "2025-07-03T14:04:45.378Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/77/b1c8af22f4265e951cd2e5535dbef8859efcef4fb8dee742d368c967cddb/fonttools-4.59.0-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:f9b3a78f69dcbd803cf2fb3f972779875b244c1115481dfbdd567b2c22b31f6b", size = 2767562, upload-time = "2025-07-16T12:04:06.895Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/5a/aeb975699588176bb357e8b398dfd27e5d3a2230d92b81ab8cbb6187358d/fonttools-4.59.0-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:57bb7e26928573ee7c6504f54c05860d867fd35e675769f3ce01b52af38d48e2", size = 2335168, upload-time = "2025-07-16T12:04:08.695Z" },
+    { url = "https://files.pythonhosted.org/packages/54/97/c6101a7e60ae138c4ef75b22434373a0da50a707dad523dd19a4889315bf/fonttools-4.59.0-cp312-cp312-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:4536f2695fe5c1ffb528d84a35a7d3967e5558d2af58b4775e7ab1449d65767b", size = 4909850, upload-time = "2025-07-16T12:04:10.761Z" },
+    { url = "https://files.pythonhosted.org/packages/bd/6c/fa4d18d641054f7bff878cbea14aa9433f292b9057cb1700d8e91a4d5f4f/fonttools-4.59.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:885bde7d26e5b40e15c47bd5def48b38cbd50830a65f98122a8fb90962af7cd1", size = 4955131, upload-time = "2025-07-16T12:04:12.846Z" },
+    { url = "https://files.pythonhosted.org/packages/20/5c/331947fc1377deb928a69bde49f9003364f5115e5cbe351eea99e39412a2/fonttools-4.59.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:6801aeddb6acb2c42eafa45bc1cb98ba236871ae6f33f31e984670b749a8e58e", size = 4899667, upload-time = "2025-07-16T12:04:14.558Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/46/b66469dfa26b8ff0baa7654b2cc7851206c6d57fe3abdabbaab22079a119/fonttools-4.59.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:31003b6a10f70742a63126b80863ab48175fb8272a18ca0846c0482968f0588e", size = 5051349, upload-time = "2025-07-16T12:04:16.388Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/05/ebfb6b1f3a4328ab69787d106a7d92ccde77ce66e98659df0f9e3f28d93d/fonttools-4.59.0-cp312-cp312-win32.whl", hash = "sha256:fbce6dae41b692a5973d0f2158f782b9ad05babc2c2019a970a1094a23909b1b", size = 2201315, upload-time = "2025-07-16T12:04:18.557Z" },
+    { url = "https://files.pythonhosted.org/packages/09/45/d2bdc9ea20bbadec1016fd0db45696d573d7a26d95ab5174ffcb6d74340b/fonttools-4.59.0-cp312-cp312-win_amd64.whl", hash = "sha256:332bfe685d1ac58ca8d62b8d6c71c2e52a6c64bc218dc8f7825c9ea51385aa01", size = 2249408, upload-time = "2025-07-16T12:04:20.489Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/9c/df0ef2c51845a13043e5088f7bb988ca6cd5bb82d5d4203d6a158aa58cf2/fonttools-4.59.0-py3-none-any.whl", hash = "sha256:241313683afd3baacb32a6bd124d0bce7404bc5280e12e291bae1b9bba28711d", size = 1128050, upload-time = "2025-07-16T12:04:52.687Z" },
 ]
 
 [[package]]
 name = "fsspec"
-version = "2025.5.1"
+version = "2025.7.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/00/f7/27f15d41f0ed38e8fcc488584b57e902b331da7f7c6dcda53721b15838fc/fsspec-2025.5.1.tar.gz", hash = "sha256:2e55e47a540b91843b755e83ded97c6e897fa0942b11490113f09e9c443c2475", size = 303033, upload-time = "2025-05-24T12:03:23.792Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/8b/02/0835e6ab9cfc03916fe3f78c0956cfcdb6ff2669ffa6651065d5ebf7fc98/fsspec-2025.7.0.tar.gz", hash = "sha256:786120687ffa54b8283d942929540d8bc5ccfa820deb555a2b5d0ed2b737bf58", size = 304432, upload-time = "2025-07-15T16:05:21.19Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bb/61/78c7b3851add1481b048b5fdc29067397a1784e2910592bc81bb3f608635/fsspec-2025.5.1-py3-none-any.whl", hash = "sha256:24d3a2e663d5fc735ab256263c4075f374a174c3410c0b25e5bd1970bceaa462", size = 199052, upload-time = "2025-05-24T12:03:21.66Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/e0/014d5d9d7a4564cf1c40b5039bc882db69fd881111e03ab3657ac0b218e2/fsspec-2025.7.0-py3-none-any.whl", hash = "sha256:8b012e39f63c7d5f10474de957f3ab793b47b45ae7d39f2fb735f8bbe25c0e21", size = 199597, upload-time = "2025-07-15T16:05:19.529Z" },
 ]
 
 [[package]]
@@ -1043,7 +1043,7 @@ wheels = [
 
 [[package]]
 name = "marimo"
-version = "0.14.10"
+version = "0.14.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -1063,9 +1063,9 @@ dependencies = [
     { name = "uvicorn" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/fa/93/d646fccda297843c41fa088e831212a425036e1cf7ea1c1fca41d7f7ad56/marimo-0.14.10.tar.gz", hash = "sha256:195247aabaccb7559532daa0313b7f47647ba78b98e151fe2b85df1f67bff79e", size = 29134153, upload-time = "2025-07-03T00:54:02.37Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/60/6e126ffe81ff4b9ba0af69b1f407b5fcd9f6d5a913559fb06f9f5ac2a0fe/marimo-0.14.11.tar.gz", hash = "sha256:cd430c37d022121b4dcfe0a5f6c8a987120d43afa7e1b9cbb75f85027f7fa8a1", size = 29247216, upload-time = "2025-07-15T19:49:18.529Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cb/7a/296b66193a41a3024b56280b53e5066050fa0213469dd528bc1b322dac88/marimo-0.14.10-py3-none-any.whl", hash = "sha256:1fb78e272aaa25405f03ce9103972660ea694efc65e5b39b653d8291a9dea719", size = 29611482, upload-time = "2025-07-03T00:54:06.436Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/88/a23e901ef3896d7a9b7caf5bf42415960fc265b7a74c1a4b7355b534893a/marimo-0.14.11-py3-none-any.whl", hash = "sha256:5e2cbdeb5b777c7e764287950e027c8c3392bce5c8e4f6255cb169f2a6a622d2", size = 29735225, upload-time = "2025-07-15T19:49:22.989Z" },
 ]
 
 [[package]]
@@ -1203,83 +1203,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/62/83/9697c211720fa71a2dfb632cad6196a8af3abea56eece220fde4674dc44b/msgpack-1.1.1-cp312-cp312-win32.whl", hash = "sha256:870b9a626280c86cff9c576ec0d9cbcc54a1e5ebda9cd26dab12baf41fee218c", size = 65406, upload-time = "2025-06-13T06:52:14.271Z" },
     { url = "https://files.pythonhosted.org/packages/c0/23/0abb886e80eab08f5e8c485d6f13924028602829f63b8f5fa25a06636628/msgpack-1.1.1-cp312-cp312-win_amd64.whl", hash = "sha256:5692095123007180dca3e788bb4c399cc26626da51629a31d40207cb262e67f4", size = 72558, upload-time = "2025-06-13T06:52:15.252Z" },
 ]
-
-[[package]]
-name = "music-embed"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "apscheduler" },
-    { name = "asyncpg" },
-    { name = "hatchling" },
-    { name = "pgvector" },
-    { name = "poetry" },
-    { name = "psycopg2-binary" },
-    { name = "python-dotenv" },
-    { name = "setuptools" },
-    { name = "sqlalchemy" },
-    { name = "xmltodict" },
-]
-
-[package.optional-dependencies]
-collecter = [
-    { name = "auditus" },
-    { name = "jukemirlib" },
-    { name = "musicbrainzngs" },
-    { name = "nest-asyncio" },
-    { name = "pylast" },
-    { name = "spotdl-lean" },
-    { name = "spotipy" },
-    { name = "umap-learn" },
-]
-db = [
-    { name = "asyncpg" },
-    { name = "pgvector" },
-    { name = "psycopg2-binary" },
-]
-frontend = [
-    { name = "ipympl" },
-    { name = "marimo" },
-    { name = "matplotlib" },
-    { name = "seaborn" },
-]
-suggester = [
-    { name = "scikit-learn" },
-    { name = "torch", version = "2.6.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
-    { name = "torch", version = "2.6.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "apscheduler", specifier = ">=3.11.0" },
-    { name = "asyncpg", specifier = ">=0.30.0" },
-    { name = "asyncpg", marker = "extra == 'db'", specifier = ">=0.30.0" },
-    { name = "auditus", marker = "extra == 'collecter'", specifier = ">=0.0.6" },
-    { name = "hatchling", specifier = ">=1.27.0" },
-    { name = "ipympl", marker = "extra == 'frontend'", specifier = ">=0.9.7" },
-    { name = "jukemirlib", marker = "extra == 'collecter'", git = "https://github.com/rodrigo-castellon/jukemirlib.git" },
-    { name = "marimo", marker = "extra == 'frontend'", specifier = ">=0.13.15" },
-    { name = "matplotlib", marker = "extra == 'frontend'", specifier = ">=3.10.3" },
-    { name = "musicbrainzngs", marker = "extra == 'collecter'", specifier = ">=0.7.1" },
-    { name = "nest-asyncio", marker = "extra == 'collecter'", specifier = ">=1.6.0" },
-    { name = "pgvector", specifier = ">=0.4.1" },
-    { name = "pgvector", marker = "extra == 'db'", specifier = ">=0.4.1" },
-    { name = "poetry", specifier = ">=2.1.3" },
-    { name = "psycopg2-binary", specifier = ">=2.9.10" },
-    { name = "psycopg2-binary", marker = "extra == 'db'", specifier = ">=2.9.10" },
-    { name = "pylast", marker = "extra == 'collecter'", specifier = ">=5.5.0" },
-    { name = "python-dotenv", specifier = ">=1.1.1" },
-    { name = "scikit-learn", marker = "extra == 'suggester'", specifier = ">=1.6.1" },
-    { name = "seaborn", marker = "extra == 'frontend'", specifier = ">=0.13.2" },
-    { name = "setuptools", specifier = ">=80.9.0" },
-    { name = "spotdl-lean", marker = "extra == 'collecter'", git = "https://github.com/RobertvdLeeuw/spotdl-lean.git" },
-    { name = "spotipy", marker = "extra == 'collecter'", specifier = ">=2.25.1" },
-    { name = "sqlalchemy", specifier = ">=2.0.41" },
-    { name = "torch", marker = "extra == 'suggester'", specifier = ">=2.6.0", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "umap-learn", marker = "extra == 'collecter'", specifier = ">=0.5.7" },
-    { name = "xmltodict", specifier = ">=0.14.2" },
-]
-provides-extras = ["db", "collecter", "suggester", "frontend"]
 
 [[package]]
 name = "musicbrainzngs"
@@ -2168,7 +2091,7 @@ wheels = [
 [[package]]
 name = "spotdl-lean"
 version = "4.2.11"
-source = { git = "https://github.com/RobertvdLeeuw/spotdl-lean.git#aeada9db0304d2ac93adc794ea4149cbcdfd7f00" }
+source = { git = "https://github.com/RobertvdLeeuw/spotdl-lean.git#844af54a9a951a23dc64c16ceb2787758dffbe4f" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "fastapi" },
@@ -2251,6 +2174,83 @@ sdist = { url = "https://files.pythonhosted.org/packages/0a/69/662169fdb92fb96ec
 wheels = [
     { url = "https://files.pythonhosted.org/packages/82/95/38ef0cd7fa11eaba6a99b3c4f5ac948d8bc6ff199aabd327a29cc000840c/starlette-0.47.1-py3-none-any.whl", hash = "sha256:5e11c9f5c7c3f24959edbf2dffdc01bba860228acf657129467d8a7468591527", size = 72747, upload-time = "2025-06-21T04:03:15.705Z" },
 ]
+
+[[package]]
+name = "suggest"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "apscheduler" },
+    { name = "asyncpg" },
+    { name = "hatchling" },
+    { name = "pgvector" },
+    { name = "poetry" },
+    { name = "psycopg2-binary" },
+    { name = "python-dotenv" },
+    { name = "setuptools" },
+    { name = "sqlalchemy" },
+    { name = "xmltodict" },
+]
+
+[package.optional-dependencies]
+collecter = [
+    { name = "auditus" },
+    { name = "jukemirlib" },
+    { name = "musicbrainzngs" },
+    { name = "nest-asyncio" },
+    { name = "pylast" },
+    { name = "spotdl-lean" },
+    { name = "spotipy" },
+    { name = "umap-learn" },
+]
+db = [
+    { name = "asyncpg" },
+    { name = "pgvector" },
+    { name = "psycopg2-binary" },
+]
+frontend = [
+    { name = "ipympl" },
+    { name = "marimo" },
+    { name = "matplotlib" },
+    { name = "seaborn" },
+]
+suggester = [
+    { name = "scikit-learn" },
+    { name = "torch", version = "2.6.0", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'darwin'" },
+    { name = "torch", version = "2.6.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform != 'darwin'" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "apscheduler", specifier = ">=3.11.0" },
+    { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "asyncpg", marker = "extra == 'db'", specifier = ">=0.30.0" },
+    { name = "auditus", marker = "extra == 'collecter'", specifier = ">=0.0.6" },
+    { name = "hatchling", specifier = ">=1.27.0" },
+    { name = "ipympl", marker = "extra == 'frontend'", specifier = ">=0.9.7" },
+    { name = "jukemirlib", marker = "extra == 'collecter'", git = "https://github.com/rodrigo-castellon/jukemirlib.git" },
+    { name = "marimo", marker = "extra == 'frontend'", specifier = ">=0.13.15" },
+    { name = "matplotlib", marker = "extra == 'frontend'", specifier = ">=3.10.3" },
+    { name = "musicbrainzngs", marker = "extra == 'collecter'", specifier = ">=0.7.1" },
+    { name = "nest-asyncio", marker = "extra == 'collecter'", specifier = ">=1.6.0" },
+    { name = "pgvector", specifier = ">=0.4.1" },
+    { name = "pgvector", marker = "extra == 'db'", specifier = ">=0.4.1" },
+    { name = "poetry", specifier = ">=2.1.3" },
+    { name = "psycopg2-binary", specifier = ">=2.9.10" },
+    { name = "psycopg2-binary", marker = "extra == 'db'", specifier = ">=2.9.10" },
+    { name = "pylast", marker = "extra == 'collecter'", specifier = ">=5.5.0" },
+    { name = "python-dotenv", specifier = ">=1.1.1" },
+    { name = "scikit-learn", marker = "extra == 'suggester'", specifier = ">=1.6.1" },
+    { name = "seaborn", marker = "extra == 'frontend'", specifier = ">=0.13.2" },
+    { name = "setuptools", specifier = ">=80.9.0" },
+    { name = "spotdl-lean", marker = "extra == 'collecter'", git = "https://github.com/RobertvdLeeuw/spotdl-lean.git" },
+    { name = "spotipy", marker = "extra == 'collecter'", specifier = ">=2.25.1" },
+    { name = "sqlalchemy", specifier = ">=2.0.41" },
+    { name = "torch", marker = "extra == 'suggester'", specifier = ">=2.6.0", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "umap-learn", marker = "extra == 'collecter'", specifier = ">=0.5.7" },
+    { name = "xmltodict", specifier = ">=0.14.2" },
+]
+provides-extras = ["db", "collecter", "suggester", "frontend"]
 
 [[package]]
 name = "sympy"
