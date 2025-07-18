@@ -13,7 +13,7 @@ import os
 
 from embedders import start_processes, end_processes
 from downloader import start_download_loop, clean_downloads
-from metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue, add_recent_listen_loop
+from metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue, add_recent_listen_loop, push_sp_user_to_db
 
 
 async def main():
@@ -22,6 +22,7 @@ async def main():
     LOGGER.debug(f"Current working directory: {os.getcwd()}")
 
     await setup()
+    user = await push_sp_user_to_db()
     
     try:
         LOGGER.info("Starting embedding worker processes...")
@@ -36,7 +37,7 @@ async def main():
         # await queue_sp_user()
 
         await asyncio.gather(start_download_loop(song_queues),
-                             add_recent_listen_loop())
+                             add_recent_listen_loop(user.spotify_id))
     except Exception as e:
         LOGGER.error(f"Main loop error: {traceback.format_exc()}")
     finally:
@@ -46,3 +47,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
