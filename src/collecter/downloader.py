@@ -5,6 +5,12 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
+from sqlalchemy import select
+from db import get_session
+
+import nest_asyncio
+nest_asyncio.apply()
+
 from spotdl import Spotdl
 from spotdl.types.options import DownloaderOptions
 
@@ -13,77 +19,91 @@ from metadata import simple_queue_new_music
 
 
 DOWNLOAD_LOC = "./downloads"
-def _sync_download(spotify_id: str) -> str:
-    """Run spotdl in a new event loop within the thread"""
-    LOGGER.debug(f"Starting synchronous download for: {spotify_id}")
-    
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    
-    LOGGER.debug("Initializing Spotdl client")
-    spotdl = Spotdl(
+LOGGER.debug("Initializing Spotdl client")
+
+from metadata import (simple_queue_new_music, 
+    push_track_metadata,
+    _get_sp_album_tracks,
+    _add_to_db_queue,
+    get_spotipy
+)
+
+
+async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downloader):
+    LOGGER.info(f"Starting download for: {spotify_id}")
+
+    # try:
+    await push_track_metadata(spotify_id)  # TODO: Background task
+
+    for fpath, sp_id in song_queue.peek_all():
+        if spotify_id == sp_id:
+            LOGGER.debug(f"Song already downloaded: {fpath}.")
+            return
+
+    spotdl = Spotdl( 
         no_cache=True,
-        client_id="a766651ba4b744ed82f1e520a75b2455",
-        client_secret="767732da0b064b838ebe5d0e3f6ce4eb",
-        downloader_settings=DownloaderOptions(format="wav", output=DOWNLOAD_LOC)
+        spotify_client=get_spotipy(),
+        downloader_settings=DownloaderOptions(format="wav", 
+                                              simple_tui=False,
+                                              print_download_errors=False,
+                                              output=DOWNLOAD_LOC),
+        loop=asyncio.get_event_loop()
     )
-    
-    LOGGER.debug(f"Searching for song: {spotify_id}")
-    song = spotdl.search([spotify_id])
-    
-    if song:
-        LOGGER.info(f"Song found: {song[0].name} by {song[0].artist}")
-        
-        _, file_path = spotdl.download(song[0])
-        
-        if os.path.exists(file_path):
-            file_size = os.path.getsize(file_path)
-            LOGGER.info(f"Download completed: {file_path} ({file_size / (1024*1024):.2f} MB).")
-        else:
-            LOGGER.error(f"Download completed but file not found: {file_path}")
-            
-        return file_path
-    else:
+    song = spotdl.search(["https://open.spotify.com/track/" + spotify_id])[0]
+
+    if not song:
         LOGGER.warning(f"No song found for id: {spotify_id}")
-        raise Exception("No song found")
+        return
 
+    LOGGER.info(f"Song found: {song.name} by {song.artist}")
+    
+    _, file_path = spotdl.download(song)
 
-async def _download(spotify_id: str):
-    LOGGER.info(f"Starting async download process for: {spotify_id}")
+    if not file_path or not os.path.exists(file_path):
+        LOGGER.error(f"Download of {spotify_id} completed but file not found: {file_path}")
+        return
 
-    try:
-        loop = asyncio.get_event_loop()
-            
-        LOGGER.debug("Executing download in thread executor")
-        with ThreadPoolExecutor() as executor:
-            file_path = await loop.run_in_executor(executor, _sync_download, spotify_id)
-        
-        LOGGER.debug(f"Adding {file_path} to processing queues")
-        _JUKEMIR_QUEUE.put(file_path)
-        _AUDITUS_QUEUE.put(file_path)
+    file_size = os.path.getsize(file_path)
+    LOGGER.info(f"Download completed: {file_path} ({file_size / (1024*1024):.2f} MB).")
 
-        LOGGER.info(f"Downloading song '{file_path}' successful.")
-        
-    except Exception as e:
-        LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
+    LOGGER.debug(f"Adding {file_path} to processing queues")
+    song_queue.put((file_path, spotify_id))
 
-async def start_download_loop(song_queues: list):
+    LOGGER.info(f"Downloading song '{file_path}' successful.")
+    
+    # except Exception as e:
+        # LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
+    return True
+
+QUEUE_MAX_LEN = 5
+async def start_download_loop(song_queues: list[SongQueue]):
     LOGGER.info(f"Download loop started.")
 
     while True:
         for q in song_queues:
             LOGGER.debug(f"{q.name} queue size: {len(q)}")
-            if len(q) > 5:
+
+            if len(q) > QUEUE_MAX_LEN:
                 continue
 
             LOGGER.debug(f"{q.name} queue has capacity, ready for new downloads")
-            
-            # Get song urls from db
-                # If queue empty, simple_queue_new_music()
-            # LOGGER.info(f"Downloading song '{url}' for {name} queue.")
-            # Collect artist and song metadata here in non-blocking call.
-            # download(url)
-            # Append to queue
+
+            async with get_session() as s:
+                n = QUEUE_MAX_LEN - len(q)
+
+                queue_items = await s.execute(select(q.q_type.spotify_id)
+                                              .limit(n)
+                                              .order_by(q.q_type.created_at.asc()))
+                queue_items = queue_items.scalars().all()
+            LOGGER.debug(f"Found {len(queue_items)} items in DB queue for {q.name}.")
+
+            _ = asyncio.gather(*[_download(q_item, q) for q_item in queue_items])
+
+            if len(queue_items) < n:
+                LOGGER.info(F"Queue of {q.name} almost empty, collecting new music (once implemented).")
+                # await _add_to_db_queue(_get_sp_album_tracks("2zQeigA4bFAlTqQqBiVe6Y"))
+                # await simple_queue_new_music()  # TODO: Background task
+
         await asyncio.sleep(30)
 
     

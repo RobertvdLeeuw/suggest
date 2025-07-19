@@ -41,7 +41,16 @@
 
       # Load a uv workspace from a workspace root.
       # Uv2nix treats all uv projects as workspace projects.
-      workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./.; };  # Loading in pyproject and project data.
+      workspace = uv2nix.lib.workspace.loadWorkspace {
+        workspaceRoot = ./.;
+        config.deps = {
+          default = true;
+          db = true;
+          collecter = true;
+          suggester = true;
+          frontend = true;
+        };
+      };  # Loading in pyproject and project data.
 
       # Create package overlay from workspace.
       overlay = workspace.mkPyprojectOverlay { 
@@ -86,49 +95,35 @@
             _final.resolveBuildSystem { setuptools = []; };
         });
 
+        hatchling = _prev.hatchling.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++
+            _final.resolveBuildSystem { 
+              setuptools = []; 
+              wheel = [];
+            };
+        });
 
-        # "tensorflow-rocm" = _prev."tensorflow-rocm".overrideAttrs (old: {
-        #   buildInputs = (old.buildInputs or []) ++ [ 
-        #     pkgs.stdenv.cc.cc.lib 
-        #     pkgs.glibc 
+        hatch-vcs = _prev.hatch-vcs.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++
+            _final.resolveBuildSystem { 
+              hatchling = [];
+              hatch-vcs = [];  # Often needed with hatchling
+              setuptools = [];  # Fallback
+            };
+        });
 
-        #     # ROCm libraries
-        #     pkgs.rocmPackages.llvm.llvm
-        #     pkgs.rocmPackages.hipcc
-        #     pkgs.rocmPackages.hipify
-        #     pkgs.rocmPackages.hiprand
-        #     pkgs.rocmPackages.hipblaslt
-        #     pkgs.rocmPackages.hip-common
-        #     pkgs.rocmPackages.hipblas-common
-        #     pkgs.rocmPackages.rpp-hip
+        spotdl-lean = _prev.spotdl-lean.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or []) ++
+            _final.resolveBuildSystem {
+              poetry = [];  
+              setuptools = [];
+              wheel = [];
+            };
+          buildInputs = (old.buildInputs or []) ++ [
+            # Add any system dependencies if needed
+          ];
+        });
 
-        #     pkgs.rocmPackages.hipblas
-        #     pkgs.rocmPackages.hipfft
-        #     pkgs.rocmPackages.hipsolver
-        #     pkgs.rocmPackages.hipsparse
-        #     pkgs.rocmPackages.rpp
-        #     pkgs.rocmPackages.rocblas
-        #     pkgs.rocmPackages.clr
-        #     pkgs.rocmPackages.hipcub
-        #     pkgs.rocmPackages.miopen
-        #     pkgs.rocmPackages.rocm-smi
-        #     pkgs.rocmPackages.rccl
-        #     pkgs.rocmPackages.rocthrust
-
-        #     pkgs.libzip
-        #     pkgs.libz
-        #     pkgs.zlib
-        #     pkgs.zlib-ng
-        #     # pythonPkgs.zlib-ng
-        #     pkgs.zstd
-
-        #     pkgs.xz
-        #     # pythonPkgs.pylzma
-
-        #     pkgs.cmake
-        #     pkgs.ninja
-        #   ];
-        # });
       };
 
       # This example is only using x86_64-linux
@@ -188,6 +183,8 @@
 
               pkgs.spotdl
               pkgs.libsndfile
+
+              pkgs.postgresql_16
               
               pkgs.rocmPackages.rocm-smi
               pkgs.rocmPackages.rocm-runtime

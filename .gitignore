@@ -5,6 +5,8 @@ data/songs/
 data/spotify.json
 downloads/
 
+src/music_embed.egg-info/
+src/music_embed.egg-info/*
 spotify_data_isrc.json
 
 # General
@@ -25,9 +27,11 @@ Cargo.lock
 
 # Logs and databases
 **/*.log
+**/*.log.*
 **/*.sqlite
 **/*.sqlite3
 **/*.db
+**/*.cache
 
 # System and backup files
 *.bak

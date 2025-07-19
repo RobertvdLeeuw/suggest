@@ -1,9 +1,12 @@
 from sqlalchemy import (
-    Column, Integer, String, Numeric, ForeignKey, 
+    Column, Integer, String, Numeric, ForeignKey, DateTime, Boolean,
     Enum as SQLEnum,
+    UniqueConstraint
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from pgvector.sqlalchemy import Vector
 
 
@@ -26,6 +29,10 @@ class Song(Base):
 
     artists = relationship("Artist", secondary="song_artist", back_populates="songs")
     extra_data = relationship("SongMetadata", back_populates="song", cascade="all, delete-orphan")
+
+    # So we can remove oldests songs in case of storage full.
+    created_at = Column(DateTime, default=func.now())  
+
     jukemir_embeddings = relationship("EmbeddingJukeMIR", back_populates="song", cascade="all, delete-orphan")
     jukemir_pca_embeddings = relationship("EmbeddingJukeMIRPCA250", back_populates="song", cascade="all, delete-orphan")
     auditus_embeddings = relationship("EmbeddingAuditus", back_populates="song", cascade="all, delete-orphan")
@@ -37,6 +44,7 @@ class Artist(Base):
     artist_id = Column(Integer, primary_key=True, autoincrement=True)
     spotify_id = Column(String(255), unique=True, nullable=False)
     artist_name = Column(String(255), unique=True, nullable=False)
+    similar_queued = Column(Boolean(), default=False)
 
     songs = relationship("Song", secondary="song_artist", back_populates="artists")
     extra_data = relationship("ArtistMetadata", back_populates="artist", cascade="all, delete-orphan")
@@ -54,6 +62,7 @@ class ArtistMetadata(Base):
     artist_id = Column(Integer, ForeignKey('artists.artist_id'), nullable=False)
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
     value = Column(String(100))
+    source = Column(String(100))
 
     artist = relationship("Artist", back_populates="extra_data")
 
@@ -64,6 +73,7 @@ class SongMetadata(Base):
     song_id = Column(Integer, ForeignKey('songs.song_id'), nullable=False)
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
     value = Column(String(100))
+    source = Column(String(100))
 
     song = relationship("Song", back_populates="extra_data")
 
@@ -71,7 +81,62 @@ class User(Base):
     __tablename__ = 'users'
 
     user_id = Column(Integer, primary_key=True, autoincrement=True)
+    spotify_id = Column(String(128), unique=True)  # TODO: Use spotify_id's as PKs everywhere?
     username = Column(String(255))
+
+class StartEndReason(Enum):
+    selected = "selected"
+    skipped = "skipped"
+    trackdone = "trackdone"
+    restarted = "restarted"
+    unknown = "unknown"
+
+
+class Listen(Base):
+    __tablename__ = "listens"
+
+    listen_id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    user_id = Column(Integer, 
+                     ForeignKey('users.user_id', 
+                                onupdate='CASCADE', 
+                                ondelete='CASCADE'), 
+                     nullable=False)
+    song_id = Column(Integer, 
+                     ForeignKey('songs.song_id', 
+                                onupdate='CASCADE', 
+                                ondelete='CASCADE'), 
+                     nullable=False)
+    
+    listened_at = Column(DateTime, default=func.now())
+    ms_played = Column(Integer)
+
+    reason_start = Column(SQLEnum(StartEndReason), 
+                          default=StartEndReason.unknown, 
+                          nullable=False)
+    reason_end = Column(SQLEnum(StartEndReason), 
+                        default=StartEndReason.unknown, 
+                        nullable=False)
+
+    source = Column(String(64))
+
+    chunks = relationship("ListenChunk", back_populates="listen", cascade="all, delete-orphan")
+
+    # Prevent duplicate listens
+    __table_args__ = (
+        UniqueConstraint('user_id', 'song_id', 'listened_at', name='uq_listen'),
+    )
+
+class ListenChunk(Base):
+    __tablename__ = 'listen_chunks'
+
+    chunk_id = Column(Integer, primary_key=True, autoincrement=True)  # Add primary key
+    listen_id = Column(Integer, ForeignKey('listens.listen_id'), primary_key=True)
+
+    from_ms = Column(Integer)
+    to_ms = Column(Integer)
+    
+    listen = relationship("Listen", back_populates="chunks")
 
 class Model(Base):
     __tablename__ = 'models'
@@ -81,7 +146,7 @@ class Model(Base):
 
     performances = relationship("ModelPerformance", back_populates="model")
 
-class MetricDefinition(Base):
+class Metric(Base):
     __tablename__ = 'metrics'
 
     metric_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -107,13 +172,14 @@ class QueueJukeMIR(Base):
     __tablename__ = 'queue_jukemir'
 
     spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
+    created_at = Column(DateTime, default=func.now())
 
 class QueueAuditus(Base):
     __tablename__ = 'queue_auditus'
 
     spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
-
-
+    created_at = Column(DateTime, default=func.now())
+    
 class EmbeddingJukeMIR(Base):
     __tablename__ = 'embeddings_jukemir'
 
@@ -149,3 +215,4 @@ class EmbeddingAuditusPCA250(Base):
     embedding = Column(Vector(250))
 
     song = relationship("Song", back_populates="auditus_pca_embeddings")
+

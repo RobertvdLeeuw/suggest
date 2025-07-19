@@ -10,7 +10,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/db/data
-      - ./db/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -20,26 +19,20 @@ services:
     networks:
       - app_network
 
-  embedder:
-    build:
-      context: ..
-      dockerfile: docker/collection/Dockerfile
-    container_name: song-collector
-    environment:
-      DEVELOPMENT_MODE: "1"
-      # LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:/usr/lib:/lib"
-    env_file:
-      - ../.env
-    # volumes:
-    #   - ./app:/app
-    depends_on:
-      postgres:
-        condition: service_healthy
-    # Alternative development command that uses uv directly
-    # Uncomment for development mode with hot reloading
-    # command: sh -c "uv pip install --system -e . && python main.py"
-    networks:
-      - app_network
+  # collecter:
+  #   build:
+  #     context: ..
+  #     dockerfile: docker/collecter/Dockerfile
+  #   container_name: python-collecter
+  #   env_file:
+  #     - ../.env
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - app_network
 
 
 networks:

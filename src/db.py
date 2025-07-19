@@ -1,207 +1,78 @@
-from sqlalchemy import (
-    create_engine, Column, Integer, String, Numeric, ForeignKey, 
-    Text, Index, Enum as SQLEnum, UniqueConstraint
-)
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
-from pgvector.sqlalchemy import Vector
-
-
-from enum import Enum
 import os
+import asyncio
+
+from sqlalchemy import URL, text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+
+from logger import LOGGER
+import traceback
+
+from models import Base
 
 from dotenv import load_dotenv
 load_dotenv()
 
+def create_database_url() -> URL:
+    return URL.create(drivername='postgresql+asyncpg',
+                      username=os.environ["POSTGRES_USER"],
+                      password=os.environ["POSTGRES_PASSWORD"],
+                      host=os.environ["POSTGRES_HOST"],
+                      port=int(os.environ["DB_PORT"]))
 
-class MetadataType(Enum):
-    tag = "tag"
-    genre = "genre"
-
-Base = declarative_base()
-
-class Song(Base):
-    __tablename__ = 'songs'
-
-    song_id = Column(Integer, primary_key=True, autoincrement=True)
-    spotify_id = Column(String(255), unique=True, nullable=False)
-    song_name = Column(String(255), nullable=False)
-    # album = Column(String(255), nullable=False)
-
-    artists = relationship("Artist", secondary="song_artist", back_populates="songs")
-    extra_data = relationship("SongMetadata", back_populates="song", cascade="all, delete-orphan")
-    jukemir_embeddings = relationship("EmbeddingJukeMIR", back_populates="song", cascade="all, delete-orphan")
-    jukemir_pca_embeddings = relationship("EmbeddingJukeMIRPCA250", back_populates="song", cascade="all, delete-orphan")
-    auditus_embeddings = relationship("EmbeddingAuditus", back_populates="song", cascade="all, delete-orphan")
-    auditus_pca_embeddings = relationship("EmbeddingAuditusPCA250", back_populates="song", cascade="all, delete-orphan")
-
-class Artist(Base):
-    __tablename__ = 'artists'
-
-    artist_id = Column(Integer, primary_key=True, autoincrement=True)
-    spotify_id = Column(String(255), unique=True, nullable=False)
-    artist_name = Column(String(255), unique=True, nullable=False)
-
-    songs = relationship("Song", secondary="song_artist", back_populates="artists")
-    extra_data = relationship("ArtistMetadata", back_populates="artist", cascade="all, delete-orphan")
-
-class SongArtist(Base):
-    __tablename__ = 'song_artist'
-
-    song_id = Column(Integer, ForeignKey('songs.song_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
-    artist_id = Column(Integer, ForeignKey('artists.artist_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
-
-class ArtistMetadata(Base):
-    __tablename__ = 'artist_metadata'
-
-    metadata_id = Column(Integer, primary_key=True, autoincrement=True)
-    artist_id = Column(Integer, ForeignKey('artists.artist_id'), nullable=False)
-    type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
-    value = Column(String(100))
-
-    artist = relationship("Artist", back_populates="extra_data")
-
-class SongMetadata(Base):
-    __tablename__ = 'song_metadata'
-
-    metadata_id = Column(Integer, primary_key=True, autoincrement=True)
-    song_id = Column(Integer, ForeignKey('songs.song_id'), nullable=False)
-    type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
-    value = Column(String(100))
-
-    song = relationship("Song", back_populates="extra_data")
-
-class User(Base):
-    __tablename__ = 'users'
-
-    user_id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(255))
-
-class Model(Base):
-    __tablename__ = 'models'
-
-    model_id = Column(Integer, primary_key=True, autoincrement=True)
-    model_name = Column(String(100))
-
-    performances = relationship("ModelPerformance", back_populates="model")
-
-class Metric(Base):
-    __tablename__ = 'metrics'
-
-    metric_id = Column(Integer, primary_key=True, autoincrement=True)
-    metric_name = Column(String(255))
-    parent_id = Column(Integer, nullable=True)
-
-    performances = relationship("ModelPerformance", back_populates="metric")
-
-class ModelPerformance(Base):
-    __tablename__ = 'model_performance'
-
-    timestamp = Column(Integer, primary_key=True, autoincrement=True)
-    model_id = Column(Integer, ForeignKey('models.model_id'), nullable=False)
-    metric_id = Column(Integer, ForeignKey('metrics.metric_id'), nullable=False)
-    song = Column(String(255), nullable=True)
-    value = Column(Numeric)
-
-    model = relationship("Model", back_populates="performances")
-    metric = relationship("Metric", back_populates="performances")
-
-
-class QueueJukeMIR(Base):
-    __tablename__ = 'queue_jukemir'
-
-    spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
-
-class QueueAuditus(Base):
-    __tablename__ = 'queue_auditus'
-
-    spotify_id = Column(String(512), unique=True, nullable=False, primary_key=True)
-
-
-class EmbeddingJukeMIR(Base):
-    __tablename__ = 'embeddings_jukemir'
-
-    song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
-    chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(Vector(4800))
-
-    song = relationship("Song", back_populates="jukemir_embeddings")
-
-class EmbeddingJukeMIRPCA250(Base):
-    __tablename__ = 'embeddings_jukemir_pca_250'
-
-    song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
-    chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(Vector(250))
-
-    song = relationship("Song", back_populates="jukemir_pca_embeddings")
-
-class EmbeddingAuditus(Base):
-    __tablename__ = 'embeddings_auditus'
-
-    song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
-    chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(Vector(768))
-
-    song = relationship("Song", back_populates="auditus_embeddings")
-
-class EmbeddingAuditusPCA250(Base):
-    __tablename__ = 'embeddings_auditus_pca_250'
-
-    song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
-    chunk_id = Column(Integer, nullable=False, primary_key=True)
-    embedding = Column(Vector(250))
-
-    song = relationship("Song", back_populates="auditus_pca_embeddings")
-
-class DatabaseManager:
-    def __init__(self, database_url: str = None):
-        if database_url is None:
-            database_url = 'postgresql://postgres:test@postgres:5432/db'
-
-        self.engine = create_engine(database_url)
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-
-
-    def get_session(self):
-        return self.SessionLocal()
-
-# Usage example
-def main():
-    db_manager = DatabaseManager()
-
-    session = db_manager.get_session()
+ENGINE = None    
+SESSION_FACTORY = None
+async def init_db():
+    global ENGINE, SESSION_FACTORY
 
     try:
-        # Create a new artist
-        artist = Artist(
-            spotify_id="4l8xPGtl6DHR2uvunqrl8r",
-            artist_name="CAN"
-        )
-        session.add(artist)
-        session.commit()
+        ENGINE = create_async_engine(create_database_url(), 
+                                     future=True, 
+                                     echo=False, 
+                                     pool_pre_ping=True)
 
-        # Create a new song
-        song = Song(
-            spotify_id="3dzCClyQ3qKx2o3CLIx02r",
-            song_name="Animal Waves",
-            # album="Example Album",
-        )
-        session.add(song)
-        session.commit()
+        # logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+        # logging.getLogger('sqlalchemy.dialects').setLevel(logging.WARNING)
+        # logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
+        # logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 
-        # Link artist and song
-        song_artist = SongArtist(song_id=song.song_id, artist_id=artist.artist_id)
-        session.add(song_artist)
-        session.commit()
-
-        print("Successfully created artist and song!")
-
+        SESSION_FACTORY = async_sessionmaker(bind=ENGINE,
+                                             class_=AsyncSession,
+                                             expire_on_commit=False)  # Keep objects usable after commit.
     except Exception as e:
-        print(f"Error: {e}")
-        session.rollback()
-    finally:
-        session.close()
+        LOGGER.error(f"Could not create session/connection: {traceback.format_exc()}")
+        raise Exception(f"Could not create session/connection: {traceback.format_exc()}")
+
+async def setup_tables():
+    await init_db()
+
+    async with ENGINE.begin() as conn:
+        await conn.execute(text("DROP SCHEMA public CASCADE;"))
+        await conn.execute(text("CREATE SCHEMA public;"))
+
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        await conn.run_sync(Base.metadata.create_all)
+
+
+def get_session() -> AsyncSession:
+    if ENGINE is None:
+        # TODO: Make this wait with timeout error?
+        raise Exception("Tried to get session before DB engine was initialized.")
+
+    return SESSION_FACTORY()
+
+
+async def setup():
+    LOGGER.info("Initializing DB engine.")
+    await init_db()
+    LOGGER.info("DB connection initialized.")
+
 
 if __name__ == "__main__":
-    main()
+    LOGGER.info("Setting up tables.")
+
+    if not input("This will remove all tables and data from the DB. Are you sure? ").lower().startswith("y"):
+        exit()
+
+    asyncio.run(setup_tables())
+
+

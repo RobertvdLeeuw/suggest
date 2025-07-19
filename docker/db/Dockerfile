@@ -1,4 +1,3 @@
-# Use the official PostgreSQL image as base
 FROM postgres:16
 
 # Install build dependencies for pgvector
@@ -8,7 +7,9 @@ RUN apt-get update \
         postgresql-server-dev-16 \
         git \
         ca-certificates \
+        wget \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Clone and build pgvector
 RUN git clone --branch v0.5.1 https://github.com/pgvector/pgvector.git \
@@ -26,3 +27,4 @@ RUN apt-get update \
         git \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
+
