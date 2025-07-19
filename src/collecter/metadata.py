@@ -570,15 +570,15 @@ async def _get_user(spotify_id: str) -> User | None:
         
 
 from collections import defaultdict
-END_REASON_MAP = defaultdict(lambda: "unknown", {"clickrow": "selected",
-                                                 "fwdbtn": "selected",
-                                                 "trackdone": "trackdone",
-                                                 "backbtn": "restarted"})
-
-START_REASON_MAP = defaultdict(lambda: "unknown", {"clickrow": "skipped",
-                                                   "fwdbtn": "skipped",
+START_REASON_MAP = defaultdict(lambda: "unknown", {"clickrow": "selected",
+                                                   "fwdbtn": "selected",
                                                    "trackdone": "trackdone",
                                                    "backbtn": "restarted"})
+
+END_REASON_MAP = defaultdict(lambda: "unknown", {"clickrow": "skipped",
+                                                 "fwdbtn": "skipped",
+                                                 "trackdone": "trackdone",
+                                                 "backbtn": "restarted"})
 
 async def add_history_listens(user_spotify_id: str, history: list[dict]):
     LOGGER.info(f"Adding {len(history)} history listens for user {user_spotify_id}")
@@ -589,7 +589,8 @@ async def add_history_listens(user_spotify_id: str, history: list[dict]):
                 "listened_at": listen["ts"],
                 "reason_start": START_REASON_MAP[listen["reason_start"]],
                 "reason_end": END_REASON_MAP[listen["reason_end"]],
-                } for listen in history]
+                } for listen in history
+                if listen["spotify_track_uri"] is not None and listen["spotify_episode_uri"] is None]
     LOGGER.debug(f"Processed {len(history)} history entries with mapped reasons")
 
     user = await _get_user(user_spotify_id)
