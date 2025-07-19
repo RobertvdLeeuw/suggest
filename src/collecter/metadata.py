@@ -106,7 +106,8 @@ def _sp_to_mb(artist_id: str) -> str | None:
             mb_id = mb_artist["artist"]["id"]
             break
     else:
-        artist_names = [a["artist"]["name"] for a in res["recording-list"][0]["artist-credit"]]
+        artist_names = [a["artist"]["name"] for a in res["recording-list"][0]["artist-credit"]
+                        if isinstance(a, dict) and "artist" not in a]
         LOGGER.warning(f"No MusicBrainz match found for {artist_name} " \
                        f"among: {", ".join(artist_names)}")
         return
@@ -270,6 +271,8 @@ async def _add_to_db_queue(spotify_track_ids: list[str]):
 # TODO: Some kind of live/remastered filter? Those are effectively duplicates (in most cases).
 
 async def queue_sp_user():  # TODO: Take userID instead of current user.
+    # NOTE: This can easily be 100s of calls and rate limit you for an entire day, DDoS-esque concern?
+
     LOGGER.info("Queueing user's Spotify library")
     liked = _get_sp_liked_tracks()
     playlist_ids = _get_sp_user_playlist()
