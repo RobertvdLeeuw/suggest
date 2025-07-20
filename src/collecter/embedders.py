@@ -1,5 +1,6 @@
 from logger import LOGGER
 import traceback
+import time
 
 import multiprocessing as mp
 import asyncio
@@ -98,10 +99,11 @@ class SongQueue:  # Queue with peek and membership testing.
             return len(self.queue)
 
     def peek(self):
-        with self.condition:
-            while len(self.queue) == 0:
-                self.condition.wait()
-            return self.queue[0]
+        while True:
+            with self.condition:
+                if len(self.queue) > 0:
+                    return self.queue[0]
+            time.sleep(1)  # So we don't hog the lock while waiting.
 
     def peek_all(self):
         with self.lock:

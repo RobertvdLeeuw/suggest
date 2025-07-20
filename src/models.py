@@ -234,8 +234,8 @@ class Suggested(Base):
         Index('idx_suggested_by', 'suggested_by'),
         Index('idx_suggested_user_score', 'user_id', 'score'),
         # Validation constraints
-        CheckConstraint('score >= 0 AND score <= 1', name='chk_suggested_score_range'),
-        CheckConstraint('predicted >= 0 AND predicted <= 1', name='chk_suggested_predicted_range'),
+        # CheckConstraint('score >= 0 AND score <= 1', name='chk_suggested_score_range'),
+        # CheckConstraint('predicted >= 0 AND predicted <= 1', name='chk_suggested_predicted_range'),
     )
 
 class Model(Base):

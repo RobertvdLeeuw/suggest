@@ -11,18 +11,55 @@ import numpy as np
 
 
 class Funnel:
-    pass
+    # TODO: Do we need funnel-level metrics as well or just at layer (singular model) level?
 
+    def __init__(self, name: str, id: str, layers: list[Layer]):
+        self.name = name
 
+        self.layers = layers
+        assert self.layer_n_match()
+
+    def layer_n_match():   
+        assert self.layers[0].n_in == 0, f"First layer of {self.name} needs to accept any n items (n_in should be 0)."
+
+        for i in range(len(self.layers)-1):
+            n_out = self.layers[i].n_out
+            n_in = self.layers[i+1].n_in
+
+            if n_out != n_in:
+                raise Exception(
+                    f"Mismatching layer in/out between layers {i+1}-{i+2}: {n_out} -> {n_in}"
+                )
+
+        return True
+
+    def __str__(self): return repr(self)
+    
+    def __repr__(self) -> str:
+        return f"""
+====== {self.name} (Funnel) =====
+  Models:
+    - {"\n\t- ".join(self.layers)}
+        """
+
+    def suggest(self, items: np.ndarray) -> list[str]:
+        return reduce(lambda x, layer: layer.process(x), self.layers)
+
+    @abstractmethod
+    def train(songs: any, T: int) -> Trajectory: pass
+
+Json = dict | list
 
 class Model(ABC):
     name: str
     allowed_metrics: list[Metric]
 
+    param_schema: Json
+
     def __init__(self, metrics: list[Metric], n_out: int, n_in: int = 0):
         assert n_in >= 0, "Layer must accept more than 1 item in, or set to 0 for any number in."
         assert n_out > 0, "Layer must allow at least 1 item out."
-        assert n_in > n_out, "Layer should filter."
+        assert n_in > n_out, "Layer should filter (in > out)."
 
         for m in metrics:
             assert all(m in self.allowed_metrics), f"Unallowed metric for {self.name}: {m.name}."
@@ -37,27 +74,50 @@ class Model(ABC):
         m = ", ".join([m.name for m in self.matrics])
         return f"{self.name} ({self.n_in} -> {self.n_out}), metrics: {m}"
         
-    def process(self, items: np.ndarray) -> np.ndarray:
-        assert items.shape[0] == self.n_in, f"{self.name} expected {self.n_in} items in, got {items.shape[0]}."
+    def process(self, embeddings: np.ndarray, song_ids: list) -> tuple[np.ndarray, list]:
+        assert embeddings.shape[0] == len(song_ids), f"{self.name} got {embeddings.shape[0]} embeddings, but {len(song_ids} song ids as input."
+        assert embeddings.shape[0] == self.n_in, f"{self.name} expected {self.n_in} items in, got {items.shape[0]}."
 
-        out = self.process_inner(items)
+        embeddings_out, ids_out = self.process_inner(embeddings, song_ids)
 
-        assert out.shape[0] == self.n_out, f"{self.name} expected {self.n_out} items out, got {out.shape[0]}."
-        return out
+        assert embeddings_out.shape[0] == self.n_out, f"{self.name} expected {self.n_out} items out, got {out.shape[0]}."
+        assert embeddings_out.shape[0] == len(ids_out), f"{self.name} got {embeddings_out.shape[0]} embeddings, but {len(ids_out} song ids as output."
+        return embeddings_out
 
     @abstractmethod
-    def process_inner(self, items: np.ndarray) -> np.ndarray: pass
+    def process_inner(self, items: np.ndarray, song_ids: list) -> tuple[np.ndarray, list]:
+        pass
+
+    @abstractmethod
+    @classmethod
+    def load(cls, hyperparams, params): 
+        
+
+    @abstractmethod
+    def to_db(self): pass
+
+    @abstractmethod
+    def validate_params(self): pass
 
 
+@dataclass
+class Trajectory: 
+    model_name: str
+    model_id: str
+    metrics: dict[str, Metric]
+    T: int
 
+    def __str__(self): return repr(self)
 
+    def __repr__(self) -> str:
+        return f"""
+====== {self.model_name} (Trajectory) =====
+  Metrics:
+    - {"\n\t- ".join([str(m) for m in self.metrics])}
+        """
 
-
-
-
-
-
-
+    @abstractmethod
+    def to_db(self): pass
 
 # ======================== OLD ===================
 
@@ -113,62 +173,4 @@ class Metric(ABC):
 
         return f"{self.name} on {self.on_event} initialized as {self.start_format}:\n\t{body}"
 
-@dataclass
-class Trajectory: 
-    model_name: str
-    model_id: str
-    metrics: dict[str, Metric]
-    T: int
-
-    def __str__(self): return repr(self)
-
-    def __repr__(self) -> str:
-        return f"""
-====== {self.model_name} (Trajectory) =====
-  Metrics:
-    - {"\n\t- ".join([str(m) for m in self.metrics])}
-        """
-
-
-class Layer(ABC):
-
-
-class Funnel:
-    # TODO: Do we need funnel-level metrics as well or just at layer (singular model) level?
-
-    def __init__(self, name: str, id: str, layers: list[Layer]):
-        self.name = name
-        self.id = id
-
-        self.layers = layers
-        assert self.layer_n_match()
-
-    def layer_n_match():   
-        assert self.layers[0].n_in == 0, f"First layer of {self.name} needs to accept any n items (n_in should be 0)."
-
-        for i in range(len(self.layers)-1):
-            n_out = self.layers[i].n_out
-            n_in = self.layers[i+1].n_in
-
-            if n_out != n_in:
-                raise Exception(
-                    f"Mismatching layer in/out between layers {i+1}-{i+2}: {n_out} -> {n_in}"
-                )
-
-        return True
-
-    def __str__(self): return repr(self)
-    
-    def __repr__(self) -> str:
-        return f"""
-====== {self.name} (Model) =====
-  Layers:
-    - {"\n\t- ".join(self.layers)}
-        """
-
-    def suggest(self, items: np.ndarray) -> list[str]:
-        return reduce(lambda x, layer: layer.process(x), self.layers)
-
-    @abstractmethod
-    def train(songs: any, T: int) -> Trajectory: pass
 
