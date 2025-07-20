@@ -1,6 +1,0 @@
-For clusters/genres/preselection, find prototypical songs (probably cluster centroids):
-  - Song genre will not be the winner of centroids but a list of distance to all centroids;
-  - Something user interaction:
-    - Show prototypical songs to user, they might instantly see the subgenre, niche, appropriate label, and apply it to make it human readable to them;
-    - Let users (try) to find prototypical songs themselves;
-    - All this linked to the 3d scatter.

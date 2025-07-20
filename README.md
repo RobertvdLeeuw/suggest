@@ -1,10 +1,17 @@
 # Suggest: An Embedding and RL-Based Music Recommendation System
-<img src="poster.png" alt="Poster" width="800"/>
+The project is set up into 3 modules:
+1. **The collecter** constantly downloads and embeds new music, and collects metadata on those tags and artists. 
+2. **The suggester** is the core of the system, running models on the embedded songs in the DB.
+3. **The validator** *will contain* a collection of visualizations of model behavior and performance.
+
+<img src="images/poster.png" alt="Poster" width="800"/>
 
 ## DB Schema
-<img src="DB_schema.png" alt="DB Schema" width="800"/>
+<img src="images/DB_schema.png" alt="DB Schema" width="800"/>
 
 For any questions about the project, check out the extra notes PDF.
 
 ## File/Folder structure:
-- To be written.
+- **docker/** contains the compose config and individual Dockerfiles.
+
+
