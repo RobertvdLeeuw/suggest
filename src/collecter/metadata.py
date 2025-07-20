@@ -3,6 +3,7 @@ from logger import LOGGER
 import traceback
 import asyncio
 import os
+import time
 
 from datetime import datetime
 
@@ -29,9 +30,6 @@ sp_oauth = SpotifyOAuth(
     scope=SCOPES
 )
 
-
-if os.path.exists(".cache"):
-    os.remove(".cache")
 
 token_info = sp_oauth.refresh_access_token(os.environ["SPOTIFY_REFRESH_TOKEN"])
 sp = spotipy.Spotify(auth=token_info['access_token'])
@@ -63,6 +61,7 @@ lastfm = pylast.LastFMNetwork(
     username=os.environ["LASTFM_USERNAME"],
     password_hash=pylast.md5(os.environ["LASTFM_PW"])
 )
+lastfm.enable_rate_limit()
 
 
 def _sp_to_lastfm(artist_id: str) -> Artist | None:
@@ -72,6 +71,7 @@ def _sp_to_lastfm(artist_id: str) -> Artist | None:
             - maybe ID with fallback system?
     """
     if artist_id is None: return None
+    time.sleep(0.25)  # Prevent rate-limit.
 
     top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
     artist_name = sp.artist(artist_id)["name"]
@@ -85,6 +85,7 @@ def _sp_to_lastfm(artist_id: str) -> Artist | None:
 
 def _sp_to_mb(artist_id: str) -> str | None:
     if artist_id is None: return None
+    time.sleep(0.25)  # Prevent rate-limit.
 
     top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
     artist_name = sp.artist(artist_id)["name"]
@@ -93,7 +94,7 @@ def _sp_to_mb(artist_id: str) -> str | None:
     res = mb.search_recordings(f'artist:"{artist_name}" AND recording:"{top_song}"')
 
     if len(res["recording-list"]) == 0:
-        LOGGER.warning(f"Rec-list:\n{res}")
+        LOGGER.warning(f"No artists found in response for '{artist_name} - {top_song}': {res}")
         return None
 
     for mb_artist in res["recording-list"][0]["artist-credit"]:
@@ -118,6 +119,7 @@ def _sp_to_mb(artist_id: str) -> str | None:
 
 def _lastfm_to_sp(artist: Artist) -> str | None:
     if artist is None: return None
+    time.sleep(0.25)  # Prevent rate-limit.
 
     top_song = artist.get_top_tracks()[0].item.get_title()
     artist_name = artist.get_name()
@@ -167,6 +169,7 @@ def _sp_collect_results(chunk: dict, data_type: str) -> list[str]:
         chunk = sp.next(chunk)
         items.extend(chunk["items"])
         LOGGER.debug(f"Collecting {data_type}, chunk {i}.")
+        time.sleep(0.5)  # Prevent rate-limit.
     
     return items
 
@@ -179,7 +182,7 @@ def _get_sp_playlist_tracks(playlist_id: str) -> list[str]:
     LOGGER.info(f"Found {len(track_ids)} tracks in playlist {playlist_id}")
     return track_ids
 
-def _get_sp_user_playlist() -> list[str]:
+def _get_sp_user_playlists() -> list[str]:
     LOGGER.debug(f"Getting user playlists.")
 
     items = _sp_collect_results(sp.current_user_playlists(limit=50), "user playlists")
@@ -271,11 +274,9 @@ async def _add_to_db_queue(spotify_track_ids: list[str]):
 # TODO: Some kind of live/remastered filter? Those are effectively duplicates (in most cases).
 
 async def queue_sp_user():  # TODO: Take userID instead of current user.
-    # NOTE: This can easily be 100s of calls and rate limit you for an entire day, DDoS-esque concern?
-
     LOGGER.info("Queueing user's Spotify library")
     liked = _get_sp_liked_tracks()
-    playlist_ids = _get_sp_user_playlist()
+    playlist_ids = _get_sp_user_playlists()
     
     LOGGER.debug(f"Processing {len(playlist_ids)} playlists")
     playlist_tracks = [track for p in playlist_ids
@@ -393,7 +394,8 @@ async def create_push_artist(spotify_id: str) -> Artist:
     LOGGER.info(f"Successfully created/retrieved artist '{artist_name}'.")
     return artist
 
-async def push_track_metadata(spotify_id: str) -> Song:
+async def create_push_track(spotify_id: str) -> Song:
+    await asyncio.sleep(0.25)  # Prevent rate-limit.
     track = sp.track(spotify_id)
     LOGGER.info(f"Adding {track['name']} to Songs with metadata.")
 
@@ -477,7 +479,7 @@ async def _add_song_listens(user_id: int, tracks: list[dict]):
                 continue
             
             # Get or create the song
-            song = await push_track_metadata(track["spotify_id"])
+            song = await create_push_track(track["spotify_id"])
             
             # Create the liten entry
             new_listen = Listen(
@@ -506,6 +508,8 @@ async def _add_song_listens(user_id: int, tracks: list[dict]):
         try:
             await s.commit()
             LOGGER.info(f"Successfully added {len(tracks)} listen entries with chunks.")
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except Exception as e:
             await s.rollback()
             LOGGER.error(f"Error adding listens: {e}")
@@ -519,6 +523,8 @@ async def push_sp_user_to_db(spotify_id=None, s=None) -> User:
         sp_user = sp.current_user()
         LOGGER.debug(f"Retrieved Spotify user: {sp_user.get('display_name', 'Unknown')} " \
                      f"({sp_user.get('id', 'Unknown ID')})")
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt
     except Exception as e:
         LOGGER.error(f"Failed to get Spotify user: {traceback.format_exc()}")
         raise Exception("Failed to get Spotify user.")
@@ -550,6 +556,8 @@ async def push_sp_user_to_db(spotify_id=None, s=None) -> User:
             
             LOGGER.info(f"User record ready: {user.username} (ID: {user.user_id})")
             return user
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except Exception as e:
             await s.rollback()
             LOGGER.error(f"Error adding user to database: {e}")
@@ -694,6 +702,8 @@ async def add_recent_listen_loop(user_spotify_id: str):
                 if len(q) >= 1:
                     next_in_queue_id = q[0]["id"]
                     LOGGER.debug(f"Next in queue: {next_in_queue_id}")
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
             except Exception as e:
                 LOGGER.warning(f"Failed to get queue: {traceback.format_exc()}")
                 next_in_queue_id = None
@@ -720,6 +730,8 @@ async def add_recent_listen_loop(user_spotify_id: str):
             listen_chunks = []
             latest_chunk_start = 0
             ms_played = 0 
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
         except Exception as e:
             LOGGER.error(f"Listen loop error details: {traceback.format_exc()}")
 

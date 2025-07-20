@@ -211,8 +211,7 @@ def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
         
         loop.run_until_complete(_async_embed_wrapper(embed_func, name, queue))
     except KeyboardInterrupt:
-        LOGGER.info(f"Process {name} interrupted")
-        sys.exit(0)
+        raise KeyboardInterrupt
     except Exception as e:
         LOGGER.error(f"Process {name} failed: {e}")
     finally:

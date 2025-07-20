@@ -10,6 +10,57 @@ import pandas as pd
 import numpy as np
 
 
+class Funnel:
+    pass
+
+
+
+class Model(ABC):
+    name: str
+    allowed_metrics: list[Metric]
+
+    def __init__(self, metrics: list[Metric], n_out: int, n_in: int = 0):
+        assert n_in >= 0, "Layer must accept more than 1 item in, or set to 0 for any number in."
+        assert n_out > 0, "Layer must allow at least 1 item out."
+        assert n_in > n_out, "Layer should filter."
+
+        for m in metrics:
+            assert all(m in self.allowed_metrics), f"Unallowed metric for {self.name}: {m.name}."
+
+        self.n_in = n_in
+        self.n_out = n_out
+        self.metrics = metrics
+
+    def __str__(self): return repr(self)
+
+    def __repr__(self) -> str:
+        m = ", ".join([m.name for m in self.matrics])
+        return f"{self.name} ({self.n_in} -> {self.n_out}), metrics: {m}"
+        
+    def process(self, items: np.ndarray) -> np.ndarray:
+        assert items.shape[0] == self.n_in, f"{self.name} expected {self.n_in} items in, got {items.shape[0]}."
+
+        out = self.process_inner(items)
+
+        assert out.shape[0] == self.n_out, f"{self.name} expected {self.n_out} items out, got {out.shape[0]}."
+        return out
+
+    @abstractmethod
+    def process_inner(self, items: np.ndarray) -> np.ndarray: pass
+
+
+
+
+
+
+
+
+
+
+
+
+# ======================== OLD ===================
+
 class TrainEvent(Enum):  # Used to define when to calc what metric.
     STEP_START = "step start"
     STEP_END = "step end"
@@ -80,37 +131,7 @@ class Trajectory:
 
 
 class Layer(ABC):
-    name: str
-    allowed_metrics: list[Metric]
 
-    def __init__(self, metrics: list[Metric], n_out: int, n_in: int = 0):
-        assert n_in >= 0, "Layer must accept more than 1 item in, or set to 0 for any number in."
-        assert n_out > 0, "Layer must allow at least 1 item out."
-        assert n_in > n_out, "Layer should filter."
-
-        for m in metrics:
-            assert all(m in self.allowed_metrics), f"Unallowed metric for {self.name}: {m.name}."
-
-        self.n_in = n_in
-        self.n_out = n_out
-        self.metrics = metrics
-
-    def __str__(self): return repr(self)
-
-    def __repr__(self) -> str:
-        m = ", ".join([m.name for m in self.matrics])
-        return f"{self.name} ({self.n_in} -> {self.n_out}), metrics: {m}"
-        
-    def process(self, items: np.ndarray) -> np.ndarray:
-        assert items.shape[0] == self.n_in, f"{self.name} expected {self.n_in} items in, got {items.shape[0]}."
-
-        out = self.process_inner(items)
-
-        assert out.shape[0] == self.n_out, f"{self.name} expected {self.n_out} items out, got {out.shape[0]}."
-        return out
-
-    @abstractmethod
-    def process_inner(self, items: np.ndarray) -> np.ndarray: pass
 
 class Funnel:
     # TODO: Do we need funnel-level metrics as well or just at layer (singular model) level?
