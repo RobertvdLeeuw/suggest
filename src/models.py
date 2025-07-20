@@ -118,7 +118,7 @@ class Listen(Base):
                         default=StartEndReason.unknown, 
                         nullable=False)
 
-    source = Column(String(64))
+    from_history = Column(Boolean, default=False)
 
     chunks = relationship("ListenChunk", back_populates="listen", cascade="all, delete-orphan")
 

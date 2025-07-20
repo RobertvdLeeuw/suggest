@@ -583,7 +583,7 @@ async def add_history_listens(user_spotify_id: str, history: list[dict]):
     LOGGER.info(f"Adding {len(history)} history listens for user {user_spotify_id}")
 
     history = [{**listen,
-                "source": "history",
+                "from_history": True,
                 "spotify_id": listen["spotify_track_uri"].split(":")[-1],
                 "listened_at": listen["ts"],
                 "reason_start": START_REASON_MAP[listen["reason_start"]],
