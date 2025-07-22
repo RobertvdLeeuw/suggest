@@ -361,7 +361,8 @@ async def queue_sp_user():  # TODO: Take userID instead of current user.
 
 async def queue_sp_history(history: list[dict]):
     LOGGER.info(f"Queueing {len(history)} tracks from listening history to embed queue.")
-    song_ids = [listen["spotify_track_uri"].split(":")[-1] for listen in history]
+    song_ids = [listen["spotify_track_uri"].split(":")[-1] for listen in history
+                if listen["spotify_track_uri"]]
     await _add_to_db_queue(song_ids)
 
 async def simple_queue_new_music():
@@ -724,8 +725,11 @@ async def add_recent_listen_loop(user_spotify_id: str):
                 LOGGER.warning(f"Failed to get queue: {traceback.format_exc()}")
                 next_in_queue_id = None
 
-            if not new_listen or not new_listen.get("item") or not new_listen["is_playing"]:
-                LOGGER.debug("No current playback, continuing loop")
+            if any(not new_listen,
+                   not new_listen.get("item"),
+                   not new_listen["is_playing"],
+                   new_listen["item"]["type"] != "track"):
+                LOGGER.debug("No current music playback, continuing loop")
                 continue
 
             ms_played += SLEEP_TIME_S * 1000
@@ -822,3 +826,21 @@ async def add_recent_listen_loop(user_spotify_id: str):
         except Exception as e:
             LOGGER.error(f"Listen loop error details: {traceback.format_exc()}")
 
+
+import asyncio
+import json
+from db import setup
+async def test():
+    folder = "/home/robert/Downloads/Spotify Extended Streaming History"
+    await setup()
+
+    for file in os.listdir(folder):
+        if not file.endswith(".json"):
+            continue
+        
+        with open(f"{folder}/{file}", "r") as f:
+            await queue_sp_history(json.load(f))
+
+if __name__ == "__main__":
+    asyncio.run(test())
+    

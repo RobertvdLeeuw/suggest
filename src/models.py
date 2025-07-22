@@ -89,7 +89,7 @@ class ArtistMetadata(Base):
     metadata_id = Column(Integer, primary_key=True, autoincrement=True)
     artist_id = Column(Integer, ForeignKey('artists.artist_id'), nullable=False)
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
-    value = Column(String(100), nullable=False)
+    value = Column(String(255), nullable=False)
     source = Column(String(100), nullable=False)
     parent_id = Column(Integer, ForeignKey('artist_metadata.metadata_id'))
     
@@ -114,7 +114,7 @@ class SongMetadata(Base):
     metadata_id = Column(Integer, primary_key=True, autoincrement=True)
     song_id = Column(Integer, ForeignKey('songs.song_id'), nullable=False)
     type = Column(SQLEnum(MetadataType), default=MetadataType.genre)
-    value = Column(String(100), nullable=False)
+    value = Column(String(255), nullable=False)
     source = Column(String(100), nullable=False)
     parent_id = Column(Integer, ForeignKey('song_metadata.metadata_id'))
     
@@ -438,6 +438,7 @@ class QueueJukeMIR(Base):
 
     __table_args__ = (
         Index('idx_queue_jukemir_created_at', 'created_at'),
+        UniqueConstraint('spotify_id' , name='uq_spotify_id_jukemir'),
     )
 
 class QueueAuditus(Base):
@@ -448,6 +449,7 @@ class QueueAuditus(Base):
     
     __table_args__ = (
         Index('idx_queue_auditus_created_at', 'created_at'),
+        UniqueConstraint('spotify_id', name='uq_spotify_id_auditus'),
     )
     
 class EmbeddingJukeMIR(Base):
