@@ -5,8 +5,8 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-from sqlalchemy import select
-from db import get_session
+from sqlalchemy import select, delete
+from db import get_session, setup
 
 import nest_asyncio
 nest_asyncio.apply()
@@ -60,13 +60,18 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         _, file_path = spotdl.download(song)
 
         if not file_path or not os.path.exists(file_path):
-            LOGGER.error(f"Download of {spotify_id} completed but file not found: {file_path}")
+            LOGGER.info(f"{spotify_id} recognized by Spotdl but audio not found on providers.")
+            async with get_session() as s:
+                # Remove from queue
+                result = await s.execute(delete(song_queue.q_type)
+                                         .where(song_queue.q_type.spotify_id == spotify_id))
+                await s.commit()
             return
 
         file_size = os.path.getsize(file_path)
-        LOGGER.info(f"Download completed: {file_path} ({file_size / (1024*1024):.2f} MB).")
+        LOGGER.debug(f"Download completed: {file_path} ({file_size / (1024*1024):.2f} MB).")
 
-        LOGGER.debug(f"Adding {file_path} to processing queues")
+        LOGGER.debug(f"Adding {file_path} to processing queues.")
         song_queue.put((file_path, spotify_id))
 
         LOGGER.info(f"Downloading song '{file_path}' successful.")
@@ -74,7 +79,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         raise KeyboardInterrupt
     except Exception as e:
         LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
-    return True
+    # return True
 
 QUEUE_MAX_LEN = 5
 async def start_download_loop(song_queues: list[SongQueue]):
@@ -82,10 +87,12 @@ async def start_download_loop(song_queues: list[SongQueue]):
 
     while True:
         for q in song_queues:
+            await asyncio.sleep(30)
+
             try:
                 LOGGER.debug(f"{q.name} queue size: {len(q)}")
 
-                if len(q) > QUEUE_MAX_LEN:
+                if len(q) >= QUEUE_MAX_LEN:
                     continue
 
                 LOGGER.debug(f"{q.name} queue has capacity, ready for new downloads")
@@ -94,8 +101,8 @@ async def start_download_loop(song_queues: list[SongQueue]):
                     n = QUEUE_MAX_LEN - len(q)
 
                     queue_items = await s.execute(select(q.q_type.spotify_id)
-                                                  .limit(n)
-                                                  .order_by(q.q_type.created_at.asc()))
+                                                  .order_by(q.q_type.created_at.asc())
+                                                  .limit(n))
                     queue_items = queue_items.scalars().all()
                 LOGGER.debug(f"Found {len(queue_items)} items in DB queue for {q.name}.")
 
@@ -106,7 +113,6 @@ async def start_download_loop(song_queues: list[SongQueue]):
                     # await _add_to_db_queue(_get_sp_album_tracks("2zQeigA4bFAlTqQqBiVe6Y"))
                     # await simple_queue_new_music()  # TODO: Background task
 
-                await asyncio.sleep(30)
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
             except Exception as e:
@@ -122,5 +128,17 @@ def clean_downloads(song_queues: list):
         else:
             LOGGER.debug(f"Deleting song '{file}'.")
             os.remove(os.path.join(DOWNLOAD_LOC, file))
-    LOGGER.debug("Finished cleaning downloads folder.")
+    LOGGER.info("Finished cleaning downloads folder.")
 
+
+async def test():
+    await setup()
+    # await _download("4sZgFgFZPIwcqDJ4FKJXD2", SongQueue("test", None))
+
+    from models import QueueJukeMIR, QueueAuditus
+    async with get_session() as s:
+        x = await s.execute(select(QueueAuditus))
+        print("X:", x.scalars().all())
+
+if __name__ == "__main__":
+    asyncio.run(test())

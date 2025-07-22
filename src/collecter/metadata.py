@@ -17,6 +17,8 @@ from spotipy.oauth2 import SpotifyOAuth
 
 from models import EmbeddingJukeMIR, EmbeddingAuditus, Artist
 
+from requests.exceptions import ReadTimeout
+
 SCOPES = ['user-library-read',
           'playlist-read-private',
           'playlist-read-collaborative',
@@ -36,6 +38,14 @@ sp = spotipy.Spotify(auth=token_info['access_token'])
 
 def get_spotipy():
     return sp
+
+def refresh_spotipy():
+    global sp
+
+    LOGGER.info("Refreshing Spotipy client access token.")
+    token_info = sp_oauth.refresh_access_token(os.environ["SPOTIFY_REFRESH_TOKEN"])
+    sp = spotipy.Spotify(auth=token_info['access_token'])
+    LOGGER.info("Refreshed Spotipy client access token.")
 
 import musicbrainzngs as mb
 mb.set_useragent("Suggest: Music Recommender", "1.0", contact=os.environ["EMAIL_ADDR"])
@@ -73,7 +83,12 @@ def _sp_to_lastfm(artist_id: str) -> Artist | None:
     if artist_id is None: return None
     # time.sleep(0.25)  # Prevent rate-limit.
 
-    top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
+    try:
+        top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
+    except:
+        LOGGER.error(F"No top track for artist '{artist_id}': {sp.artist_top_tracks(artist_id)}")
+        return
+
     artist_name = sp.artist(artist_id)["name"]
 
     LOGGER.debug(f"Using top song '{top_song}' by '{artist_name}' for Last.fm lookup")
@@ -87,7 +102,11 @@ def _sp_to_mb(artist_id: str) -> str | None:
     if artist_id is None: return None
     # time.sleep(0.25)  # Prevent rate-limit.
 
-    top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
+    try:
+        top_song = sp.artist_top_tracks(artist_id)["tracks"][0]["name"]
+    except:
+        LOGGER.error(F"No top track for artist '{artist_id}': {sp.artist_top_tracks(artist_id)}")
+        return
     artist_name = sp.artist(artist_id)["name"]
     LOGGER.info(f"Searching MusicBrainz for: {artist_name} - {top_song}")
 
@@ -386,9 +405,15 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 
 @pass_session_capable
-async def create_push_artist(spotify_id: str, session=None) -> Artist:
+async def create_push_artist(spotify_id: str, session=None) -> Artist | None:
     artist_name = sp.artist(spotify_id)["name"]
     LOGGER.info(f"Adding {artist_name} to Artists with metadata.")
+
+    artist_result = await session.execute(
+        select(Artist).where(Artist.spotify_id == spotify_id)
+    )
+    if artist := artist_result.scalar_one_or_none():
+        return artist
 
     try:
         stmt = insert(Artist).values(
@@ -445,7 +470,7 @@ async def create_push_artist(spotify_id: str, session=None) -> Artist:
         artist_result = await session.execute(
             select(Artist).where(Artist.spotify_id == spotify_id)
         )
-        artist = artist_result.scalar_one()
+        artist = artist_result.scalar_one_or_none()
 
     LOGGER.info(f"Successfully created/retrieved artist '{artist_name}'.")
     return artist
@@ -462,8 +487,8 @@ async def create_push_track(spotify_id: str, session=None) -> Song:
 
     artists = []
     for artist_data in track["artists"]:
-        artist = await create_push_artist(artist_data["id"], session=session)
-        artists.append(artist)
+        if artist := await create_push_artist(artist_data["id"], session=session):
+            artists.append(artist)
 
     try:
         song = Song(
@@ -682,12 +707,28 @@ async def add_recent_listen_loop(user_spotify_id: str):
     while True:
         try:
             await asyncio.sleep(SLEEP_TIME_S)
-            ms_played += SLEEP_TIME_S * 1000
             new_listen = sp.current_playback()
             
+            try:
+                # NOTE: This queue call doesn't tell us whether the q-item was deliberately
+                # put in the queue orjust happens to be the next thing in the playlist/album/etc.
+                q = sp.queue()["queue"]
+                if len(q) >= 1:
+                    if next_in_queue_id != q[0]["id"]:
+                        LOGGER.debug(f"Next in queue: {next_in_queue_id}")
+                        next_in_queue_id = q[0]["id"]
+
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+            except Exception as e:
+                LOGGER.warning(f"Failed to get queue: {traceback.format_exc()}")
+                next_in_queue_id = None
+
             if not new_listen or not new_listen.get("item") or not new_listen["is_playing"]:
                 LOGGER.debug("No current playback, continuing loop")
                 continue
+
+            ms_played += SLEEP_TIME_S * 1000
 
             if current_listen is None:
                 current_listen = new_listen
@@ -750,19 +791,10 @@ async def add_recent_listen_loop(user_spotify_id: str):
                 new_reason_start = "unknown"
                 LOGGER.debug("Unknown reason for song change")
 
-            try:
-                q = sp.queue()["queue"]
-                if len(q) >= 1:
-                    next_in_queue_id = q[0]["id"]
-                    LOGGER.debug(f"Next in queue: {next_in_queue_id}")
-            except KeyboardInterrupt:
-                raise KeyboardInterrupt
-            except Exception as e:
-                LOGGER.warning(f"Failed to get queue: {traceback.format_exc()}")
-                next_in_queue_id = None
 
-            listen_chunks.append({"from_ms": latest_chunk_start, 
-                                  "to_ms": current_listen["progress_ms"]})
+            if current_listen["progress_ms"] > latest_chunk_start:  # Not adding 0ms chunks.
+                listen_chunks.append({"from_ms": latest_chunk_start, 
+                                      "to_ms": current_listen["progress_ms"]})
             listen_data = {
                 "spotify_id": current_listen["item"]["id"],
                 "source": "live",
@@ -785,6 +817,8 @@ async def add_recent_listen_loop(user_spotify_id: str):
             ms_played = 0 
         except KeyboardInterrupt:
             raise KeyboardInterrupt
+        except ReadTimeout:
+            LOGGER.warning(f"Recent listen loops got timeout on request - could be ratelimit.")
         except Exception as e:
             LOGGER.error(f"Listen loop error details: {traceback.format_exc()}")
 

@@ -16,7 +16,7 @@ import os
 
 from embedders import start_processes, end_processes
 from downloader import start_download_loop, clean_downloads
-from metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue, add_recent_listen_loop, push_sp_user_to_db
+from metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue, add_recent_listen_loop, push_sp_user_to_db, refresh_spotipy
 
 
 async def main():
@@ -34,6 +34,7 @@ async def main():
         
         scheduler = AsyncIOScheduler()
         scheduler.add_job(clean_downloads, 'interval', hours=1, args=(song_queues,))
+        # scheduler.add_job(refresh_spotipy, 'interval', minutes=55)  # Race issues?
         scheduler.start()
 
         # await _add_to_db_queue(_get_sp_album_tracks("2zQeigA4bFAlTqQqBiVe6Y"))

@@ -3,13 +3,15 @@ import asyncio
 import contextlib
 from typing import Optional, AsyncGenerator
 
-from sqlalchemy import URL, text, event
+from sqlalchemy import URL, text, event, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 from sqlalchemy.events import PoolEvents
 
 from logger import LOGGER
 import traceback
+
+import numpy as np
 
 from models import Base
 
@@ -175,6 +177,27 @@ async def setup():
 async def shutdown_db():
     """Gracefully shutdown database connections"""
     await db_manager.cleanup()
+
+
+async def get_embeddings(emb_type) -> np.ndarray:  # Structured array (basically a better dict.)
+    async with get_session() as s:
+        results = await s.execute(select(emb_type))
+        items = results.scalars().all()
+
+    embedding_dim = len(items[0].embedding) if results else 0
+    dtype = [
+        ('song_id', 'i4'),
+        ('chunk_id', 'i4'), 
+        ('embedding', f'f4', (embedding_dim,))
+    ]
+
+    data = np.fromiter(
+        ((x.song_id, x.chunk_id, x.embedding) for x in items),
+        dtype=dtype
+    )
+
+    return data
+
 
 if __name__ == "__main__":
     async def main():

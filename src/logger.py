@@ -2,6 +2,7 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 
 import sqlalchemy
+import os
 
 # Set SQLAlchemy engine logging to WARNING to reduce output
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
@@ -10,7 +11,7 @@ logging.getLogger('sqlalchemy.pool').setLevel(logging.WARNING)
 logging.getLogger('sqlalchemy.orm').setLevel(logging.WARNING)
 
 def new_logger(log_path: str):
-    with open(log_path, 'w'):
+    with open(log_path, 'w'): # TODO: OS remove all old logs, not just most recent.
         pass
 
     file_handler = TimedRotatingFileHandler(log_path, when='midnight', interval=1, backupCount=7)

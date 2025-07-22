@@ -169,7 +169,7 @@ def _auditus_embed(file_path: str, song_id: str) -> list[EmbeddingAuditus]:
     LOGGER.info(f"Auditus embedding of '{file_path}' successful.")
     return embeddings
 
-async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
+async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue, emb_type):
     LOGGER.info(f"{name} embedding loop started.")
     await setup()
 
@@ -182,13 +182,18 @@ async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue)
             
             async with get_session() as s:
                 result = await s.execute(select(Song).where(Song.spotify_id == spotify_id))
-                item = result.scalar_one_or_none()
+                song = result.scalar_one_or_none()
 
-                assert item is not None, f"About to embed using {name}, but no Song matching {spotify_id} found."
+                assert song is not None, f"About to embed using {name}, but no Song matching {spotify_id} found."
 
-                LOGGER.debug(f"Start embed, {name}, {item}.")
-                embeddings = embed_func(song_file, item.song_id)
-                s.add_all(embeddings)
+                result = await s.execute(select(emb_type).where(emb_type.song_id == song.song_id))
+                if result.scalar_one_or_none() is None:
+                    LOGGER.debug(f"Start embed, {name}, {song.song_name}.")
+                    embeddings = embed_func(song_file, song.song_id)
+                    s.add_all(embeddings)
+                else:
+                    LOGGER.warning(f"About to embed {song.song_name} using {name}, " \
+                                   "but it's already embedded.")
 
                 # Remove from queue
                 result = await s.execute(delete(queue.q_type)
@@ -205,13 +210,13 @@ async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue)
 
         queue.get()
 
-def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
+def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue, emb_type):
     """Synchronous wrapper that runs the async embed_wrapper in an event loop"""
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        loop.run_until_complete(_async_embed_wrapper(embed_func, name, queue))
+        loop.run_until_complete(_async_embed_wrapper(embed_func, name, queue, emb_type))
     except KeyboardInterrupt:
         raise KeyboardInterrupt
     except Exception as e:
@@ -220,18 +225,18 @@ def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue):
         if 'loop' in locals():
             loop.close()
 
-EMBEDDERS = [(_jukemir_embed, "JukeMIR", QueueJukeMIR),
-             (_auditus_embed, "Auditus", QueueAuditus)]
+EMBEDDERS = [(_jukemir_embed, "JukeMIR", QueueJukeMIR, EmbeddingJukeMIR),
+             (_auditus_embed, "Auditus", QueueAuditus, EmbeddingAuditus)]
 PROCESSES = []
 def start_processes() -> list[SongQueue]:
     queues = []
-    for embed_func, name, q_type in EMBEDDERS:
+    for embed_func, name, q_type, emb_type in EMBEDDERS:
         q = SongQueue(name, q_type)
         queues.append(q)
 
         process = mp.Process(
             target=_embed_wrapper, 
-            args=(embed_func, name, q)
+            args=(embed_func, name, q, emb_type)
         )
         PROCESSES.append(process)
         process.start()
