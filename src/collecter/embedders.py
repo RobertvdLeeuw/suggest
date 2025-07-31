@@ -1,6 +1,7 @@
 from logger import LOGGER
 import traceback
 import time
+import os
 
 import multiprocessing as mp
 import asyncio
@@ -36,10 +37,15 @@ def _jukemir_load():
     if not _jukemir_loaded:
         LOGGER.debug("Loading JukeMIR Module...")
         import librosa as _lr
-        import jukemirlib as _jukemirlib
+
+        if os.getenv("TEST_MODE"):
+            from test_fakes import jukemirlib_fake as _jukemirlib
+            jukemirlib = _jukemirlib()
+        else:
+            import jukemirlib as _jukemirlib
+            jukemirlib = _jukemirlib
         
         lr = _lr
-        jukemirlib = _jukemirlib
         _jukemir_loaded = True
         LOGGER.debug("JukeMIR Module loaded successfully")
 
@@ -48,11 +54,17 @@ def _auditus_load():
     global _auditus_loaded, AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
     if not _auditus_loaded:
         LOGGER.debug("Loading Auditus Module...")
-        from auditus.transform import AudioArray as _AudioArray, AudioLoader as _AudioLoader, AudioEmbedding as _AudioEmbedding, Resampling as _Resampling, Pooling as _Pooling
-        
+        if os.getenv("TEST_MODE"):
+            from test_fakes import auditus_fake as _auditus
+            AudioEmbedding = _auditus.AudioEmbedding()
+        else:
+            from auditus.transform import AudioEmbedding as _AudioEmbedding
+            AudioEmbedding = _AudioEmbedding
+
+        from auditus.transform import AudioArray as _AudioArray, AudioLoader as _AudioLoader, Resampling as _Resampling, Pooling as _Pooling
+    
         AudioArray = _AudioArray
         AudioLoader = _AudioLoader
-        AudioEmbedding = _AudioEmbedding
         Resampling = _Resampling
         Pooling = _Pooling
         _auditus_loaded = True
@@ -109,7 +121,6 @@ class SongQueue:  # Queue with peek and membership testing.
         with self.lock:
             return list(self.queue)
 
-
 def _jukemir_embed(file_path: str, song_id: str) -> list[EmbeddingJukeMIR]:
     _jukemir_load()
 
@@ -133,7 +144,6 @@ def _jukemir_embed(file_path: str, song_id: str) -> list[EmbeddingJukeMIR]:
 
     LOGGER.info(f"JukeMIR embedding of '{file_path}' successful.")
     return embeddings
-
 
 def _auditus_embed(file_path: str, song_id: str) -> list[EmbeddingAuditus]:
     _auditus_load()
