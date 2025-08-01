@@ -57,14 +57,15 @@ def _auditus_load():
         if os.getenv("TEST_MODE"):
             from test_fakes import auditus_fake as _auditus
             AudioEmbedding = _auditus.AudioEmbedding()
+            AudioLoader = _auditus.AudioLoader()
         else:
-            from auditus.transform import AudioEmbedding as _AudioEmbedding
+            from auditus.transform import AudioEmbedding as _AudioEmbedding, AudioLoader as _AudioLoader
             AudioEmbedding = _AudioEmbedding
+            AudioLoader = _AudioLoader
 
-        from auditus.transform import AudioArray as _AudioArray, AudioLoader as _AudioLoader, Resampling as _Resampling, Pooling as _Pooling
+        from auditus.transform import AudioArray as _AudioArray, Resampling as _Resampling, Pooling as _Pooling
     
         AudioArray = _AudioArray
-        AudioLoader = _AudioLoader
         Resampling = _Resampling
         Pooling = _Pooling
         _auditus_loaded = True

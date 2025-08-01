@@ -11,8 +11,11 @@ from db import get_session, setup
 import nest_asyncio
 nest_asyncio.apply()
 
-from spotdl import Spotdl
 from spotdl.types.options import DownloaderOptions
+if os.getenv("TEST_MODE"):
+    from test_fakes import Spotdl
+else:
+    from spotdl import Spotdl
 
 from embedders import SongQueue
 from metadata import simple_queue_new_music
