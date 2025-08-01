@@ -56,8 +56,8 @@ def _auditus_load():
         LOGGER.debug("Loading Auditus Module...")
         if os.getenv("TEST_MODE"):
             from mocks import auditus_fake as _auditus
-            AudioEmbedding = _auditus.AudioEmbedding()
-            AudioLoader = _auditus.AudioLoader()
+            AudioEmbedding = _auditus().AudioEmbedding
+            AudioLoader = _auditus().AudioLoader()
         else:
             from auditus.transform import AudioEmbedding as _AudioEmbedding, AudioLoader as _AudioLoader
             AudioEmbedding = _AudioEmbedding

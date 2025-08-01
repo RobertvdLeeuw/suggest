@@ -15,7 +15,7 @@ from pylast import Artist, Track
 from spotipy.oauth2 import SpotifyOAuth
 
 if os.getenv("TEST_MODE"):
-    from mocks import musicbrainz_fake, pylast_fake, spotifake
+    from mocks import musicbrainz_fake, pylast_fake, spotipy_fake
 
     mb = musicbrainz_fake()
     pylast = pylast_fake()
@@ -734,10 +734,10 @@ async def add_recent_listen_loop(user_spotify_id: str):
                 LOGGER.warning(f"Failed to get queue: {traceback.format_exc()}")
                 next_in_queue_id = None
 
-            if any(not new_listen,
-                   not new_listen.get("item"),
-                   not new_listen["is_playing"],
-                   new_listen["item"]["type"] != "track"):
+            if any([not new_listen,
+                    not new_listen.get("item"),
+                    not new_listen["is_playing"],
+                    new_listen["item"]["type"] != "track"]):
                 LOGGER.debug("No current music playback, continuing loop")
                 continue
 

@@ -1,14 +1,16 @@
 import numpy as np
 import random
+import os
 
 class jukemirlib_fake:
-    def extract(self, audio: np.array, duration: float, offset=0.0) -> np.array:
-        return np.random.rand(4800)
+    def extract(self, audio: np.array, layers: list[int], 
+                meanpool: bool, offset=0.0) -> dict[int, np.array]:
+        return {l: np.random.rand(4800) for l in layers}
     
     def load_audio(self, file_path: str, offset=0.0, duration=None) -> np.array:
         return np.array([])
 
-
+SAMPLE_RATE = 32_000
 from auditus.transform import AudioArray
 class auditus_fake:
     def AudioEmbedding(self, return_tensors="pt") -> callable:
@@ -17,8 +19,9 @@ class auditus_fake:
 
         return inner
 
-    def AudioLoader(self, file_path: str) -> AudioArray:
-        return AudioArray(a=np.random.rand(2, 100_000), sr=32_000)
+    class AudioLoader:
+        def load_audio(self, file_path: str) -> AudioArray:
+            return AudioArray(a=np.random.rand(2, 100_000), sr=SAMPLE_RATE)
 
 
 from pylast import TopItem
@@ -29,8 +32,19 @@ class NamedItem:
     def get_name(self) -> str:
         return self.name
 
+class Artist_fake(NamedItem):
+    def get_top_tags(self) -> list[TopItem]:
+        return [TopItem(item=NamedItem("Large"), weight=random.random()),
+                TopItem(item=NamedItem("Non-fiction"), weight=random.random()),
+                TopItem(item=NamedItem("Mystery"), weight=random.random()),
+                TopItem(item=NamedItem("Thriller"), weight=random.random())]
+
 class Track_fake:
-    def get_artist(self) -> NamedItem: return NamedItem("CAN")
+    def __init__(self, artist: str, title: str):
+        self.artist = artist
+        self.title = title
+
+    def get_artist(self) -> Artist_fake: return Artist_fake(self.artist)
 
     def get_top_tags(self) -> list[TopItem]:
         return [TopItem(item=NamedItem("Funky"), weight=random.random()),
@@ -41,7 +55,7 @@ class Track_fake:
 class LastFM_fake:
     def enable_rate_limit(self): pass 
 
-    def get_track(artist: str, title: str) -> Track_fake:
+    def get_track(self, artist: str, title: str) -> Track_fake:
         return Track_fake(artist=artist, title=title)
 
 
@@ -49,6 +63,9 @@ class pylast_fake:
     def LastFMNetwork(self, api_key: str, api_secret: str, 
                       username: str, password_hash: str) -> LastFM_fake:
         return LastFM_fake()
+    
+    def md5(self, password: str) -> str:
+        return password
 
 Json = dict | list
 from musicbrainzngs.musicbrainz import ResponseError
@@ -1225,11 +1242,12 @@ class spotipy_fake:
         return Spotifake()
 
 from spotdl.types.song import Song
+import soundfile as sf
 class Spotdl:
     def __init__(self, no_cache: bool, spotify_client=None, downloader_settings=None, loop=None):
         pass
 
-    def search(self, spotify_id): 
+    def search(self, spotify_urls: list[str]): 
         return [
             Song(name='Halleluhwah',
                  artists=['CAN'],
@@ -1267,13 +1285,25 @@ class Spotdl:
                  list_length=None,
                  artist_id='4l8xPGtl6DHR2uvunqrl8r',
                  album_type='album',
-                 spotify_id=spotify_id)  # For unique filenames later.
+                 spotify_id=spotify_url.replace("https://open.spotify.com/track/", ""))  # For unique filenames later.
+            for spotify_url in spotify_urls
         ]
 
     def download(self, song: Song) -> tuple[Song, str]:
-        file_path = f"mock_downloads/{song.spotify_id}.wav"
-        with open(file_path, "w") as f:
-            f.write()
+        mock_path = "./mock_downloads"
+
+        if not os.path.isdir(mock_path):
+            os.mkdir(mock_path)
+
+        file_path = f"{mock_path}/{song.spotify_id}.wav"
+
+        duration_s = 30.0 
+        num_samples = int(duration_s * SAMPLE_RATE)
+        
+        # Random audio (stereo)
+        audio_data = np.random.uniform(-0.1, 0.1, (num_samples, 2)).astype(np.float32)
+        
+        sf.write(file_path, audio_data, SAMPLE_RATE)
 
         return song, file_path
 

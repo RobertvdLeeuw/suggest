@@ -1,3 +1,10 @@
+import sys
+import os
+
+if "-t" in sys.argv or "--test" in sys.argv:
+    os.environ["TEST_MODE"] = "true"
+
+
 import multiprocessing as mp
 mp.set_start_method('spawn', force=True)
 
@@ -11,8 +18,6 @@ import traceback
 import asyncio
 import threading
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-
-import os
 
 from embedders import start_processes, end_processes
 from downloader import start_download_loop, clean_downloads

@@ -4,6 +4,7 @@ data/enriched.csv
 data/songs/
 data/spotify.json
 downloads/
+mock_downloads/
 
 src/music_embed.egg-info/
 src/music_embed.egg-info/*
