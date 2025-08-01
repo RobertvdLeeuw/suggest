@@ -1,9 +1,6 @@
 [build-system]
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
-# [build-system]
-# requires = ["poetry-core"]
-# build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "suggest"
@@ -26,6 +23,8 @@ dependencies = [
     "hatchling>=1.27.0",
     "antithesis>=0.1.18",
     "soxr>=0.5.0.post1",
+    "hypothesis>=6.136.6",
+    "pytest>=8.4.1",
 ]
 
 [project.optional-dependencies]

@@ -249,8 +249,8 @@
                         root = old.src;
                         fileset = lib.fileset.unions [ 
                           (old.src + "/pyproject.toml")
-                          (old.src + "/README.md")
-                          (lib.fileset.maybeMissing (old.src + "/src"))
+                          (old.src + "/src")
+                          (old.src + "/tests") 
                         ];
                       };
 
@@ -289,6 +289,7 @@
                   export REPO_ROOT=$(git rev-parse --show-toplevel)  # TODO: This could be useful for nvim or other tools to find project root.
                   
                   export PATH="${virtualenv}/bin:$PATH" # Let Python know about the virtualenv for imports
+                  export PYTHONPATH="$REPO_ROOT"
                 '';
               };
         };

@@ -15,7 +15,7 @@ from pylast import Artist, Track
 from spotipy.oauth2 import SpotifyOAuth
 
 if os.getenv("TEST_MODE"):
-    from mocks import musicbrainz_fake, pylast_fake, spotipy_fake
+    from tests.mocks.apis import musicbrainz_fake, pylast_fake, spotipy_fake
 
     mb = musicbrainz_fake()
     pylast = pylast_fake()

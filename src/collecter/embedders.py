@@ -39,7 +39,7 @@ def _jukemir_load():
         import librosa as _lr
 
         if os.getenv("TEST_MODE"):
-            from mocks import jukemirlib_fake as _jukemirlib
+            from tests.mocks.embedders import jukemirlib_fake as _jukemirlib
             jukemirlib = _jukemirlib()
         else:
             import jukemirlib as _jukemirlib
@@ -55,7 +55,7 @@ def _auditus_load():
     if not _auditus_loaded:
         LOGGER.debug("Loading Auditus Module...")
         if os.getenv("TEST_MODE"):
-            from mocks import auditus_fake as _auditus
+            from tests.mocks.embedders import auditus_fake as _auditus
             AudioEmbedding = _auditus().AudioEmbedding
             AudioLoader = _auditus().AudioLoader()
         else:

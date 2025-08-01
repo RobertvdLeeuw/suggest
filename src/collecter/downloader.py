@@ -13,7 +13,7 @@ nest_asyncio.apply()
 
 from spotdl.types.options import DownloaderOptions
 if os.getenv("TEST_MODE"):
-    from mocks import Spotdl
+    from tests.mocks.embedders import Spotdl_fake as Spotdl
 else:
     from spotdl import Spotdl
 

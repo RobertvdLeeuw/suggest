@@ -120,6 +120,15 @@ wheels = [
 ]
 
 [[package]]
+name = "attrs"
+version = "25.3.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5a/b0/1367933a8532ee6ff8d63537de4f1177af4bff9f3e829baf7331f595bb24/attrs-25.3.0.tar.gz", hash = "sha256:75d7cefc7fb576747b2c81b4442d4d4a1ce0900973527c011d1030fd3bf4af1b", size = 812032, upload-time = "2025-03-13T11:10:22.779Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/06/bb80f5f86020c4551da315d78b3ab75e8228f89f0162f2c3a819e407941a/attrs-25.3.0-py3-none-any.whl", hash = "sha256:427318ce031701fea540783410126f03899a97ffc6f61596ad581ac2e40e3bc3", size = 63815, upload-time = "2025-03-13T11:10:21.14Z" },
+]
+
+[[package]]
 name = "audioread"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -713,12 +722,34 @@ wheels = [
 ]
 
 [[package]]
+name = "hypothesis"
+version = "6.136.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "sortedcontainers" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e2/d6/6c45c56cdc532f25a354cf2c93a3bebc21b91b6a48125e3acfd364161447/hypothesis-6.136.6.tar.gz", hash = "sha256:2ad2e4f2012be4d41c6515b0628d84d48af6e6c38b4db50840bd9ac0899f5856", size = 458049, upload-time = "2025-07-28T09:48:02.495Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/e2/7fd1a9b12740b3472349f7e3c216e94b1b2e03d32c9d842284b57eb5a3f8/hypothesis-6.136.6-py3-none-any.whl", hash = "sha256:1d6296dde36d42263bd44a084c74e91467e78186676e410167f920aa0374a9e7", size = 524958, upload-time = "2025-07-28T09:47:58.938Z" },
+]
+
+[[package]]
 name = "idna"
 version = "3.10"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7590aa73f1f1d3fa9a380e654b86af429e0934a32f7d/idna-3.10.tar.gz", hash = "sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9", size = 190490, upload-time = "2024-09-15T18:07:39.745Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442, upload-time = "2024-09-15T18:07:37.964Z" },
+]
+
+[[package]]
+name = "iniconfig"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c909642694d71c9fcf53e5b504f2d96afea02718862f3/iniconfig-2.1.0.tar.gz", hash = "sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7", size = 4793, upload-time = "2025-03-19T20:09:59.721Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl", hash = "sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760", size = 6050, upload-time = "2025-03-19T20:10:01.071Z" },
 ]
 
 [[package]]
@@ -1749,6 +1780,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest"
+version = "8.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/08/ba/45911d754e8eba3d5a841a5ce61a65a685ff1798421ac054f85aa8747dfb/pytest-8.4.1.tar.gz", hash = "sha256:7c67fd69174877359ed9371ec3af8a3d2b04741818c51e5e99cc1742251fa93c", size = 1517714, upload-time = "2025-06-18T05:48:06.109Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/16/c8a903f4c4dffe7a12843191437d7cd8e32751d5de349d45d3fe69544e87/pytest-8.4.1-py3-none-any.whl", hash = "sha256:539c70ba6fcead8e78eebbf1115e8b589e7565830d7d006a8723f19ac8a0afb7", size = 365474, upload-time = "2025-06-18T05:48:03.955Z" },
+]
+
+[[package]]
 name = "python-dateutil"
 version = "2.9.0.post0"
 source = { registry = "https://pypi.org/simple" }
@@ -2062,6 +2109,15 @@ wheels = [
 ]
 
 [[package]]
+name = "sortedcontainers"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/c4/ba2f8066cceb6f23394729afe52f3bf7adec04bf9ed2c820b39e19299111/sortedcontainers-2.4.0.tar.gz", hash = "sha256:25caa5a06cc30b6b83d11423433f65d1f9d76c4c6a0c90e3379eaa43b9bfdb88", size = 30594, upload-time = "2021-05-16T22:03:42.897Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/32/46/9cb0e58b2deb7f82b84065f37f3bffeb12413f947f9388e4cac22c4621ce/sortedcontainers-2.4.0-py2.py3-none-any.whl", hash = "sha256:a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0", size = 29575, upload-time = "2021-05-16T22:03:41.177Z" },
+]
+
+[[package]]
 name = "soundcloud-v2"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2211,9 +2267,11 @@ dependencies = [
     { name = "apscheduler" },
     { name = "asyncpg" },
     { name = "hatchling" },
+    { name = "hypothesis" },
     { name = "pgvector" },
     { name = "poetry" },
     { name = "psycopg2-binary" },
+    { name = "pytest" },
     { name = "python-dotenv" },
     { name = "setuptools" },
     { name = "soxr" },
@@ -2257,6 +2315,7 @@ requires-dist = [
     { name = "asyncpg", marker = "extra == 'db'", specifier = ">=0.30.0" },
     { name = "auditus", marker = "extra == 'collecter'", specifier = ">=0.0.6" },
     { name = "hatchling", specifier = ">=1.27.0" },
+    { name = "hypothesis", specifier = ">=6.136.6" },
     { name = "ipympl", marker = "extra == 'frontend'", specifier = ">=0.9.7" },
     { name = "jukemirlib", marker = "extra == 'collecter'", git = "https://github.com/rodrigo-castellon/jukemirlib.git" },
     { name = "marimo", marker = "extra == 'frontend'", specifier = ">=0.13.15" },
@@ -2269,6 +2328,7 @@ requires-dist = [
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "psycopg2-binary", marker = "extra == 'db'", specifier = ">=2.9.10" },
     { name = "pylast", marker = "extra == 'collecter'", specifier = ">=5.5.0" },
+    { name = "pytest", specifier = ">=8.4.1" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "scikit-learn", marker = "extra == 'suggester'", specifier = ">=1.6.1" },
     { name = "seaborn", marker = "extra == 'frontend'", specifier = ">=0.13.2" },
