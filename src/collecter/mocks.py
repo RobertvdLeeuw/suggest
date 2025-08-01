@@ -50,7 +50,6 @@ class pylast_fake:
                       username: str, password_hash: str) -> LastFM_fake:
         return LastFM_fake()
 
-
 Json = dict | list
 from musicbrainzngs.musicbrainz import ResponseError
 class musicbrainz_fake:
