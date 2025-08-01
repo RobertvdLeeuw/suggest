@@ -13,7 +13,7 @@ nest_asyncio.apply()
 
 from spotdl.types.options import DownloaderOptions
 if os.getenv("TEST_MODE"):
-    from test_fakes import Spotdl
+    from mocks import Spotdl
 else:
     from spotdl import Spotdl
 
@@ -58,7 +58,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
             LOGGER.warning(f"No song found for id: {spotify_id}")
             return
 
-        LOGGER.info(f"Song found: {song.name} by {song.artist}")
+        LOGGER.info(f"Song found for '{spotify_id}: {song.name} by {song.artist}")
         
         _, file_path = spotdl.download(song)
 

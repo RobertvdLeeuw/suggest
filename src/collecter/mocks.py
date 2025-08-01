@@ -142,7 +142,6 @@ class musicbrainz_fake:
             }
         }
 
-# spotipy
 class Spotifake:
     def artist_top_tracks(self, artist_id: str) -> Json: 
         return {
@@ -1279,4 +1278,3 @@ class Spotdl:
 
         return song, file_path
 
-# db

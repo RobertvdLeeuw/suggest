@@ -15,7 +15,7 @@ from pylast import Artist, Track
 from spotipy.oauth2 import SpotifyOAuth
 
 if os.getenv("TEST_MODE"):
-    from test_fakes import musicbrainz_fake, pylast_fake, spotifake
+    from mocks import musicbrainz_fake, pylast_fake, spotifake
 
     mb = musicbrainz_fake()
     pylast = pylast_fake()
@@ -489,23 +489,7 @@ async def create_push_artist(spotify_id: str, session=None) -> Artist | None:
 async def create_push_track(spotify_id: str, session=None) -> Song:
     await asyncio.sleep(0.25)  # Prevent rate-limit.
     track = sp.track(spotify_id)
-    LOGGER.info(f"Adding {track['name']} t": [
-                                {
-                                    "height": 640,
-                                        "width": 640,
-                                            "url": "https://i.scdn.co/image/ab67616d0000b273f6087e1308518847564b7eb0"
-                                        },
-                                        {
-                                            "height": 300,
-                                "width": 300,
-                                "url": "https://i.scdn.co/image/ab67616d00001e02f6087e1308518847564b7eb0"
-                                        },
-                                        {
-                                            "height": 64,
-                                "width": 64,
-                                "url": "https://i.scdn.co/image/ab67616d00004851f6087e1308518847564b7eb0"
-                                        }
-                                    ],Songs with metadata.")
+    LOGGER.info(f"Adding song {track['name']} with metadata.")
 
     if song := await check_in_table(Song, Song.spotify_id, spotify_id, session=session):
         LOGGER.info(f"Song {track['name']} already exists.")
