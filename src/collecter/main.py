@@ -38,7 +38,7 @@ async def main():
         song_queues = start_processes()
         
         scheduler = AsyncIOScheduler()
-        scheduler.add_job(clean_downloads, 'interval', hours=1, args=(song_queues,))
+        scheduler.add_job(clean_downloads, 'interval', minutes=1, args=(song_queues,))
         # scheduler.add_job(refresh_spotipy, 'interval', minutes=55)  # Race issues?
         scheduler.start()
 

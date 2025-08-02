@@ -90,7 +90,7 @@ async def start_download_loop(song_queues: list[SongQueue]):
 
     while True:
         for q in song_queues:
-            await asyncio.sleep(30)
+            await asyncio.sleep(0.1)
 
             try:
                 LOGGER.debug(f"{q.name} queue size: {len(q)}")

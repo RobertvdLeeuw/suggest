@@ -239,9 +239,12 @@ def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue, emb_type):
 EMBEDDERS = [(_jukemir_embed, "JukeMIR", QueueJukeMIR, EmbeddingJukeMIR),
              (_auditus_embed, "Auditus", QueueAuditus, EmbeddingAuditus)]
 PROCESSES = []
-def start_processes() -> list[SongQueue]:
+def start_processes(selection: list[QueueObject] = []) -> list[SongQueue]:
     queues = []
     for embed_func, name, q_type, emb_type in EMBEDDERS:
+        if selection and q_type not in selection:
+            continue
+
         q = SongQueue(name, q_type)
         queues.append(q)
 

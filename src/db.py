@@ -14,6 +14,7 @@ import traceback
 import numpy as np
 
 from models import Base
+from tests.mocks.db import fake_session, fake_results
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -165,6 +166,9 @@ async def setup_tables():
 
 def get_session():
     """Get session context manager"""
+    # if os.getenv("TEST_MODE_NO_DB"):
+        # return fake_session()
+
     return db_manager.get_session()
 
 async def setup():
