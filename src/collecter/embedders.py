@@ -6,7 +6,7 @@ import os
 import multiprocessing as mp
 import asyncio
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, exists
 
 from models import EmbeddingJukeMIR, EmbeddingAuditus, QueueJukeMIR, QueueAuditus, Song
 from db import setup, get_session
@@ -197,8 +197,8 @@ async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue,
 
                 assert song is not None, f"About to embed using {name}, but no Song matching {spotify_id} found."
 
-                result = await s.execute(select(emb_type).where(emb_type.song_id == song.song_id))
-                if result.scalar_one_or_none() is None:
+                result = await s.execute(select(exists().where(emb_type.song_id == song.song_id)))
+                if not result.scalar():
                     LOGGER.debug(f"Start embed, {name}, {song.song_name}.")
                     embeddings = embed_func(song_file, song.song_id)
                     s.add_all(embeddings)
@@ -231,7 +231,7 @@ def _embed_wrapper(embed_func: callable, name: str, queue: mp.Queue, emb_type):
     except KeyboardInterrupt:
         raise KeyboardInterrupt
     except Exception as e:
-        LOGGER.error(f"Process {name} failed: {e}")
+        LOGGER.error(f"Process {name} failed: {traceback.format_exc()}")
     finally:
         if 'loop' in locals():
             loop.close()

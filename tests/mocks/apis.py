@@ -1,3 +1,5 @@
+import random
+
 from pylast import TopItem
 class NamedItem:
     def __init__(self, name: str):

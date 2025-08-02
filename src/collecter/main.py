@@ -19,9 +19,9 @@ import asyncio
 import threading
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from embedders import start_processes, end_processes
-from downloader import start_download_loop, clean_downloads
-from metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue, add_recent_listen_loop, push_sp_user_to_db, refresh_spotipy
+from collecter.embedders import start_processes, end_processes
+from collecter.downloader import start_download_loop, clean_downloads
+from collecter.metadata import queue_sp_user, _get_sp_album_tracks, _add_to_db_queue, add_recent_listen_loop, push_sp_user_to_db, refresh_spotipy
 
 
 async def main():

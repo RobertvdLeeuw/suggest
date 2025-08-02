@@ -14,7 +14,6 @@ import traceback
 import numpy as np
 
 from models import Base
-from tests.mocks.db import fake_session, fake_results
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -26,6 +25,7 @@ class DatabaseManager:
     _engine: Optional[AsyncEngine] = None
     _session_factory: Optional[async_sessionmaker] = None
     _initialized: bool = False
+    _test_session: Optional[AsyncSession] = None
     
     def __new__(cls) -> 'DatabaseManager':
         if cls._instance is None:
@@ -33,14 +33,13 @@ class DatabaseManager:
         return cls._instance
     
     def create_database_url(self) -> URL:
-        # Add database name and ensure all required components
         return URL.create(
             drivername='postgresql+asyncpg',
             username=os.environ["POSTGRES_USER"],
             password=os.environ["POSTGRES_PASSWORD"],
             host=os.environ["POSTGRES_HOST"],
             port=int(os.environ["DB_PORT"]),
-            database=os.environ.get("POSTGRES_DB", "postgres")  # Add database name
+            database=os.environ.get("POSTGRES_DB", "db")  # "test_db"
         )
     
     async def initialize(self) -> None:
@@ -106,13 +105,23 @@ class DatabaseManager:
             LOGGER.error(f"Could not initialize database: {traceback.format_exc()}")
             await self.cleanup()
             raise Exception(f"Database initialization failed: {str(e)}")
-    
+
+    def set_test_session(self, session: Optional[AsyncSession]):
+        """Set a test session to override normal session creation."""
+        self._test_session = session
+
     @contextlib.asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Context manager for database sessions with proper cleanup"""
         if not self._initialized:
             raise RuntimeError("Database not initialized. Call initialize() first.")
         
+        # If test session is set, use it but don't manage its lifecycle
+        if self._test_session is not None:
+            yield self._test_session
+            return
+        
+        # Normal production behavior
         session = self._session_factory()
         try:
             yield session
@@ -166,9 +175,6 @@ async def setup_tables():
 
 def get_session():
     """Get session context manager"""
-    # if os.getenv("TEST_MODE_NO_DB"):
-        # return fake_session()
-
     return db_manager.get_session()
 
 async def setup():

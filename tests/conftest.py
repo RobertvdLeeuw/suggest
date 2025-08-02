@@ -1,5 +1,15 @@
 import pytest
+import asyncio
+import sys
+import os
+from typing import AsyncGenerator
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
+# Add src to path so imports work
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
+from db import DatabaseManager
 from models import Base
 
 @pytest.fixture(scope="session")
@@ -12,20 +22,26 @@ def event_loop():
 @pytest.fixture(scope="session")
 async def test_db_manager():
     """Create a test database manager for the entire test session."""
+    DatabaseManager._instance = None
+    DatabaseManager._engine = None
+    DatabaseManager._session_factory = None
+    DatabaseManager._initialized = False
+
     db_manager = DatabaseManager()
     
     original_create_url = db_manager.create_database_url
     
     def test_create_url():
         url = original_create_url()
-        return url.set(database="test_collecter")
+        return url.set(database="test_db")
     
     db_manager.create_database_url = test_create_url
     
     await db_manager.initialize()
     
     # Create test database if it doesn't exist
-    async with db_manager.get_engine().begin() as conn:
+    engine = await db_manager.get_engine()
+    async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
     
@@ -33,6 +49,7 @@ async def test_db_manager():
     
     # Cleanup after all tests
     await db_manager.cleanup()
+    DatabaseManager._instance = None
 
 @pytest.fixture(scope="function")
 async def clean_session(test_db_manager) -> AsyncGenerator[AsyncSession, None]:
@@ -41,16 +58,18 @@ async def clean_session(test_db_manager) -> AsyncGenerator[AsyncSession, None]:
     Uses transaction rollback for fast cleanup.
     """
     # Start a transaction
-    connection = await test_db_manager.get_engine().connect()
+    engine = await test_db_manager.get_engine()
+    connection = await engine.connect()
     transaction = await connection.begin()
     
     # Create session bound to this transaction
     session = AsyncSession(bind=connection, expire_on_commit=False)
+    test_db_manager.set_test_session(session)
     
     try:
         yield session
     finally:
+        test_db_manager.set_test_session(None)
         await session.close()
-        # Rollback the transaction - this undoes all changes
         await transaction.rollback()
         await connection.close()

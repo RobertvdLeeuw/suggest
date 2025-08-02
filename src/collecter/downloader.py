@@ -17,14 +17,14 @@ if os.getenv("TEST_MODE"):
 else:
     from spotdl import Spotdl
 
-from embedders import SongQueue
-from metadata import simple_queue_new_music
+from collecter.embedders import SongQueue
+from collecter.metadata import simple_queue_new_music
 
 
 DOWNLOAD_LOC = "./downloads"
 LOGGER.debug("Initializing Spotdl client")
 
-from metadata import (simple_queue_new_music, 
+from collecter.metadata import (simple_queue_new_music, 
     create_push_track,
     _get_sp_album_tracks,
     _add_to_db_queue,

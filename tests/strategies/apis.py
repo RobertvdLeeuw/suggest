@@ -1,22 +1,12 @@
 from hypothesis import strategies as st
 from collecter.embedders import QueueObject
-from models import Song, Artist, User, Listen, ListenChunk, SongMetadata, MetadataType, StartEndReason, QueueJukeMIR, QueueAuditus
+from models import Song, Artist, User, Listen, ListenChunk, SongMetadata, MetadataType, StartEndReason
 
 
 @st.composite
 def spotify_id_strat(draw):
-    return data.draw(st.from_regex("[a-zA-Z0-9]{2}"))
+    return data.draw(st.from_regex("[a-zA-Z0-9]{22}"))
 
-
-@st.composite
-def q_item_strat(draw):
-    """Generate Song objects with optional artist relationships."""
-
-    spotify_id = draw(spotify_id_strat())
-    song_name = draw(st.text(min_size=1, max_size=100))
-    
-    q_type = st.sampled_from([q.value for q in QueueObject])
-    return q_type(spotify_id=spotify_id)
 
 @st.composite
 def song_strat(draw, artists=None):

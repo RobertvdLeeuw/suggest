@@ -24,7 +24,9 @@ dependencies = [
     "antithesis>=0.1.18",
     "soxr>=0.5.0.post1",
     "hypothesis>=6.136.6",
+    "pytest-asyncio>=1.1.0",
     "pytest>=8.4.1",
+    "pytest-xdist>=3.8.0",
 ]
 
 [project.optional-dependencies]
@@ -77,3 +79,23 @@ name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+asyncio_mode = "auto"
+
+markers = [
+    "collecter: Core queue processing tests",
+    "slow: Slow running tests",
+]
+
+addopts = [
+    "-v",
+    "--tb=short", 
+    "--strict-markers"
+]
+
+timeout = 300

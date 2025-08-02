@@ -519,7 +519,7 @@ async def create_push_track(spotify_id: str, session=None) -> Song:
                     ) for tag in lfm_song.get_top_tags()
                 ])
         except Exception as e:
-            LOGGER.debug(f"Failed to get LastFM data for {track['name']}: {e}")
+            LOGGER.debug(f"Failed to get LastFM data for {track['name']}: {traceback.format_exc()}")
 
         try:
             if mb_songs := mb.search_recordings(f'artist:"{track["artists"][0]["name"]}" AND recording:"{track["name"]}"'):
@@ -537,7 +537,7 @@ async def create_push_track(spotify_id: str, session=None) -> Song:
                         ) for tag in tags_data["recording"].get("tag-list", [])
                     ])
         except Exception as e:
-            LOGGER.debug(f"Failed to get MusicBrainz data for {track['name']}: {e}")
+            LOGGER.debug(f"Failed to get MusicBrainz data for {track['name']}: {traceback.format_exc()}")
 
         song.extra_data = metadata
         session.add(song)
@@ -603,7 +603,7 @@ async def _add_song_listens(user_id: int, tracks: list[dict], session=None):
         raise KeyboardInterrupt
     except Exception as e:
         await session.rollback()
-        LOGGER.error(f"Error adding listens: {e}")
+        LOGGER.error(f"Error adding listens: {traceback.format_exc()}")
         raise
 
 @pass_session_capable
@@ -648,7 +648,7 @@ async def push_sp_user_to_db(spotify_id=None, session=None) -> User:
         raise KeyboardInterrupt
     except Exception as e:
         await session.rollback()
-        LOGGER.error(f"Error adding user to database: {e}")
+        LOGGER.error(f"Error adding user to database: {traceback.format_exc()}")
         LOGGER.debug(f"User creation error details: {traceback.format_exc()}")
         raise
 
