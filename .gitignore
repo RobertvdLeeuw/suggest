@@ -6,6 +6,8 @@ data/spotify.json
 downloads/
 mock_downloads/
 
+.hypothesis/
+
 src/music_embed.egg-info/
 src/music_embed.egg-info/*
 spotify_data_isrc.json

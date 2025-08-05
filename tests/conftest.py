@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+from contextlib import asynccontextmanager
 import sys
 import os
 from typing import AsyncGenerator
@@ -16,11 +17,13 @@ from models import Base
 def event_loop():
     """Create an instance of the default event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
+    asyncio.set_event_loop(loop)
+
     yield loop
     loop.close()
 
 @pytest.fixture(scope="session")
-async def test_db_manager():
+async def test_db_manager(event_loop):
     """Create a test database manager for the entire test session."""
     DatabaseManager._instance = None
     DatabaseManager._engine = None
@@ -28,15 +31,6 @@ async def test_db_manager():
     DatabaseManager._initialized = False
 
     db_manager = DatabaseManager()
-    
-    original_create_url = db_manager.create_database_url
-    
-    def test_create_url():
-        url = original_create_url()
-        return url.set(database="test_db")
-    
-    db_manager.create_database_url = test_create_url
-    
     await db_manager.initialize()
     
     # Create test database if it doesn't exist
@@ -51,12 +45,16 @@ async def test_db_manager():
     await db_manager.cleanup()
     DatabaseManager._instance = None
 
-@pytest.fixture(scope="function")
-async def clean_session(test_db_manager) -> AsyncGenerator[AsyncSession, None]:
+@asynccontextmanager
+async def get_clean_session(test_db_manager):
+    """Context manager that provides a clean database session for each use.
+    
+    This can be used in tests that need fresh database state for each iteration,
+    particularly useful with Hypothesis property-based tests.
     """
-    Provide a clean database session for each test function.
-    Uses transaction rollback for fast cleanup.
-    """
+    # Ensure we're using the correct event loop
+    # loop = asyncio.get_event_loop()
+    
     # Start a transaction
     engine = await test_db_manager.get_engine()
     connection = await engine.connect()
@@ -73,3 +71,13 @@ async def clean_session(test_db_manager) -> AsyncGenerator[AsyncSession, None]:
         await session.close()
         await transaction.rollback()
         await connection.close()
+
+# Keep this fixture for tests that don't use Hypothesis
+@pytest.fixture(scope="function")
+async def clean_session(test_db_manager, event_loop) -> AsyncGenerator[AsyncSession, None]:
+    """
+    Provide a clean database session for regular tests (non-Hypothesis).
+    Uses transaction rollback for fast cleanup.
+    """
+    async with get_clean_session(test_db_manager) as session:
+        yield session

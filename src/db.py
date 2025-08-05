@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 from sqlalchemy.events import PoolEvents
 
-from logger import LOGGER
+from logger import get_logger
 import traceback
+LOGGER = get_logger()
 
 import numpy as np
 
@@ -39,7 +40,7 @@ class DatabaseManager:
             password=os.environ["POSTGRES_PASSWORD"],
             host=os.environ["POSTGRES_HOST"],
             port=int(os.environ["DB_PORT"]),
-            database=os.environ.get("POSTGRES_DB", "db")  # "test_db"
+            database= "test_db" if os.getenv("TEST_MODE") else os.environ.get("POSTGRES_DB", "db")
         )
     
     async def initialize(self) -> None:
@@ -114,7 +115,8 @@ class DatabaseManager:
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Context manager for database sessions with proper cleanup"""
         if not self._initialized:
-            raise RuntimeError("Database not initialized. Call initialize() first.")
+            LOGGER.info("DB not initialized yet, doing that now.")
+            await self.initialize()
         
         # If test session is set, use it but don't manage its lifecycle
         if self._test_session is not None:
@@ -136,7 +138,8 @@ class DatabaseManager:
     async def get_engine(self) -> AsyncEngine:
         """Get the database engine"""
         if not self._initialized:
-            raise RuntimeError("Database not initialized. Call initialize() first.")
+            LOGGER.info("DB not initialized yet, doing that now.")
+            await self.initialize()
         return self._engine
     
     async def cleanup(self) -> None:
@@ -148,7 +151,8 @@ class DatabaseManager:
         self._engine = None
         self._session_factory = None
         self._initialized = False
-    
+        self._instance = None
+
     async def setup_tables(self) -> None:
         """Setup database tables (dangerous - drops all data!)"""
         await self.initialize()

@@ -51,4 +51,14 @@ def new_logger(log_path: str):
 
     return logger
 
-LOGGER = new_logger("logs/log.log")
+
+LOGGER = None
+def get_logger():
+    global LOGGER
+
+    if LOGGER is None:
+        log_path = f"{"test_logs" if os.getenv("TEST_MODE") else "logs"}/log.log"
+        LOGGER = new_logger(log_path)
+        LOGGER.info(f"Logger initialized with path '{log_path}'.")
+
+    return LOGGER

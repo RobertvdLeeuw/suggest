@@ -86,6 +86,7 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
 
 markers = [
     "collecter: Core queue processing tests",
@@ -98,4 +99,4 @@ addopts = [
     "--strict-markers"
 ]
 
-timeout = 300
+# timeout = 300

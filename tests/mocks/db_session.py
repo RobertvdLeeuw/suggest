@@ -19,14 +19,6 @@ async def test_db_manager():
     """Create a test database manager for the entire test session."""
     db_manager = DatabaseManager()
     
-    original_create_url = db_manager.create_database_url
-    
-    def test_create_url():
-        url = original_create_url()
-        return url.set(database="test_collecter")
-    
-    db_manager.create_database_url = test_create_url
-    
     await db_manager.initialize()
     
     # Create test database if it doesn't exist
@@ -38,14 +30,19 @@ async def test_db_manager():
     
     await db_manager.cleanup()
 
-@pytest.fixture(scope="function")
-async def clean_session(test_db_manager) -> AsyncGenerator[AsyncSession, None]:
+@asynccontextmanager
+async def get_clean_session(test_db_manager):
+    """Context manager that provides a clean database session for each use.
+    
+    This can be used in tests that need fresh database state for each iteration,
+    particularly useful with Hypothesis property-based tests.
     """
-    Provide a clean database session for each test function.
-    Uses transaction rollback for fast cleanup.
-    """
+    # Ensure we're using the correct event loop
+    loop = asyncio.get_event_loop()
+    
     # Start a transaction
-    connection = await test_db_manager.get_engine().connect()
+    engine = await test_db_manager.get_engine()
+    connection = await engine.connect()
     transaction = await connection.begin()
     
     # Create session bound to this transaction
@@ -57,7 +54,15 @@ async def clean_session(test_db_manager) -> AsyncGenerator[AsyncSession, None]:
     finally:
         test_db_manager.set_test_session(None)
         await session.close()
-
-        # Rollback the transaction - this undoes all changes
         await transaction.rollback()
         await connection.close()
+
+# Keep this fixture for tests that don't use Hypothesis
+@pytest.fixture(scope="function")
+async def clean_session(test_db_manager, event_loop) -> AsyncGenerator[AsyncSession, None]:
+    """
+    Provide a clean database session for regular tests (non-Hypothesis).
+    Uses transaction rollback for fast cleanup.
+    """
+    async with get_clean_session(test_db_manager) as session:
+        yield session

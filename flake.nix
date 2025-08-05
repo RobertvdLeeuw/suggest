@@ -52,7 +52,6 @@
         };
       };  # Loading in pyproject and project data.
 
-      # Create package overlay from workspace.
       overlay = workspace.mkPyprojectOverlay { 
         sourcePreference = "wheel";  # Wheel is best, apparently.
         # Optionally customise PEP 508 environment

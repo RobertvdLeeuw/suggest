@@ -5,7 +5,7 @@ from models import Song, Artist, User, Listen, ListenChunk, SongMetadata, Metada
 
 @st.composite
 def spotify_id_strat(draw):
-    return data.draw(st.from_regex("[a-zA-Z0-9]{22}"))
+    return draw(st.from_regex("[a-zA-Z0-9]{22}"))
 
 
 @st.composite

@@ -1,5 +1,7 @@
-from logger import LOGGER
+from logger import get_logger
 import traceback
+LOGGER = get_logger()
+
 import time
 import os
 
@@ -10,6 +12,7 @@ from sqlalchemy import select, delete, exists
 
 from models import EmbeddingJukeMIR, EmbeddingAuditus, QueueJukeMIR, QueueAuditus, Song
 from db import setup, get_session
+from collecter.metadata import create_push_track
 
 from math import floor
 import numpy as np
@@ -35,13 +38,14 @@ def _jukemir_load():
     """Lazy load JukeMIR dependencies"""
     global _jukemir_loaded, lr, jukemirlib
     if not _jukemir_loaded:
-        LOGGER.debug("Loading JukeMIR Module...")
         import librosa as _lr
 
         if os.getenv("TEST_MODE"):
+            LOGGER.debug("Loading mock JukeMIR module...")
             from tests.mocks.embedders import jukemirlib_fake as _jukemirlib
             jukemirlib = _jukemirlib()
         else:
+            LOGGER.debug("Loading (actual) JukeMIR module...")
             import jukemirlib as _jukemirlib
             jukemirlib = _jukemirlib
         
@@ -53,12 +57,13 @@ def _auditus_load():
     """Lazy load Auditus dependencies"""
     global _auditus_loaded, AudioArray, AudioLoader, AudioEmbedding, Resampling, Pooling
     if not _auditus_loaded:
-        LOGGER.debug("Loading Auditus Module...")
         if os.getenv("TEST_MODE"):
+            LOGGER.debug("Loading mock Auditus module...")
             from tests.mocks.embedders import auditus_fake as _auditus
             AudioEmbedding = _auditus().AudioEmbedding
             AudioLoader = _auditus().AudioLoader()
         else:
+            LOGGER.debug("Loading Auditus module...")
             from auditus.transform import AudioEmbedding as _AudioEmbedding, AudioLoader as _AudioLoader
             AudioEmbedding = _AudioEmbedding
             AudioLoader = _AudioLoader
@@ -192,10 +197,7 @@ async def _async_embed_wrapper(embed_func: callable, name: str, queue: mp.Queue,
             song_file, spotify_id = queue.peek()
             
             async with get_session() as s:
-                result = await s.execute(select(Song).where(Song.spotify_id == spotify_id))
-                song = result.scalar_one_or_none()
-
-                assert song is not None, f"About to embed using {name}, but no Song matching {spotify_id} found."
+                song = await create_push_track(spotify_id)
 
                 result = await s.execute(select(exists().where(emb_type.song_id == song.song_id)))
                 if not result.scalar():

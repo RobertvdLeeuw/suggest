@@ -5,7 +5,9 @@ from enum import Enum
 from functools import reduce
 from copy import deepcopy
 
-from logger import LOGGER
+from logger import get_logger
+import traceback
+LOGGER = get_logger()
 
 from db import get_session
 from models import EmbeddingJukeMIR, EmbeddingAuditus, Funnel as FunnelORM

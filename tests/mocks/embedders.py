@@ -9,7 +9,16 @@ class jukemirlib_fake:
         return np.array([])
 
 SAMPLE_RATE = 32_000
-from auditus.transform import AudioArray
+# from auditus.transform import AudioArray
+class AudioArray:  # So we don't have to import leading to loading entire model into memory.
+    def __init__(self, a: np.array, sr: int):
+        self.a = a
+        self.sr = sr
+    
+    def shape(self): return self.a.shape
+    def __len__(self): return len(self.a)
+    def __getitem__(self, idx): return self.a[idx]
+
 class auditus_fake:
     def AudioEmbedding(self, return_tensors="pt") -> callable:
         def inner(audio: AudioArray) -> np.array:
@@ -76,7 +85,7 @@ class Spotdl_fake:
         if not os.path.isdir(mock_path):
             os.mkdir(mock_path)
 
-        file_path = f"{mock_path}/{song.spotify_id}.wav"
+        file_path = f"{mock_path}/{song.artist} - {song.name}.wav"
 
         duration_s = 30.0 
         num_samples = int(duration_s * SAMPLE_RATE)
