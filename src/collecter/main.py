@@ -1,19 +1,22 @@
+import multiprocessing as mp
+# mp.set_start_method('spawn', force=True)
+
 import sys
 import os
 
 if "-t" in sys.argv or "--test" in sys.argv:
     os.environ["TEST_MODE"] = "true"
 
-from logger import get_logger
+from logger import setup_multiprocess_logging
+setup_multiprocess_logging()
+import logging
+LOGGER = logging.getLogger(__name__)
 import traceback
-LOGGER = get_logger()
+
 if os.getenv("TEST_MODE"):
     LOGGER.info("Test mode initiated, using test DB and mocks.")
 
 LOGGER.info("Starting imports...")
-
-# import multiprocessing as mp
-# mp.set_start_method('spawn', force=True)
 
 from db import setup, get_session
 import traceback
@@ -45,7 +48,7 @@ async def main():
         
         scheduler = AsyncIOScheduler()
         scheduler.add_job(clean_downloads, 'interval', minutes=1, args=(song_queues,))
-        # scheduler.add_job(refresh_spotipy, 'interval', minutes=55)  # Race issues?
+        scheduler.add_job(refresh_spotipy, 'interval', minutes=55)  # Race issues?
         scheduler.start()
 
         # await _add_to_db_queue(_get_sp_album_tracks("2zQeigA4bFAlTqQqBiVe6Y"))
@@ -61,6 +64,6 @@ async def main():
         end_processes()
 
 if __name__ == "__main__":
-    # mp.freeze_support()
+    mp.freeze_support()
     asyncio.run(main())
 

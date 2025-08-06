@@ -1,6 +1,6 @@
-from logger import get_logger
 import traceback
-LOGGER = get_logger()
+import logging
+LOGGER = logging.getLogger(__name__)
 
 import os
 from pathlib import Path

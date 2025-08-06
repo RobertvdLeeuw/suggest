@@ -7,7 +7,8 @@ from copy import deepcopy
 
 from logger import get_logger
 import traceback
-LOGGER = get_logger()
+import logging
+LOGGER = logging.getLogger(__name__)
 
 from db import get_session
 from models import EmbeddingJukeMIR, EmbeddingAuditus, Funnel as FunnelORM

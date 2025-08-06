@@ -1,11 +1,11 @@
-from logger import get_logger
 import traceback
-LOGGER = get_logger()
+import logging
+LOGGER = logging.getLogger(__name__)
 
 import time
 import os
 
-import threading
+import multiprocessing as mp
 from queue import Queue
 import asyncio
 
@@ -86,46 +86,47 @@ class SongQueue:  # Queue with peek and membership testing.
         self.name = name
         self.q_type = q_type
 
-        self.queue = Queue(maxsize=QUEUE_MAX_LEN)
-        self._items = []  # Internal list to track items for peek/contains
-        self.lock = threading.Lock()
-        self.condition = threading.Condition(self.lock)
+        self.queue = mp.Manager().list()
+        self.lock = mp.Lock()
+        self.condition = mp.Condition(self.lock)
     
     def put(self, item):
         with self.lock:
-            if item not in self._items:
-                self.queue.put(item)
-                self._items.append(item)
+            if item not in self.queue:
+                self.queue.append(item)
                 self.condition.notify()
                 return True
             return False
 
     def get(self):
         with self.condition:
-            while len(self._items) == 0:
+            while len(self.queue) == 0:
                 self.condition.wait()
-            item = self.queue.get()
-            self._items.remove(item)  # Remove from tracking list
-            return item
+            return self.queue.pop(0)
+
+    def remove(self, item):
+        with self.lock:
+            if item in self.queue:
+                self.queue.remove(item)
     
     def __contains__(self, item):
         with self.lock:
-            return item in self._items
+            return item in self.queue
 
     def __len__(self):
         with self.lock:
-            return len(self._items)
+            return len(self.queue)
 
     def peek(self):
         while True:
             with self.condition:
-                if len(self._items) > 0:
-                    return self._items[0]
+                if len(self.queue) > 0:
+                    return self.queue[0]
             time.sleep(1)  # So we don't hog the lock while waiting.
 
     def peek_all(self):
         with self.lock:
-            return self._items.copy()  # Return copy to avoid external modification
+            return list(self.queue)
 
 
 def _jukemir_embed(file_path: str, song_id: str) -> list[EmbeddingJukeMIR]:
@@ -242,20 +243,16 @@ def _embed_wrapper(embed_func: callable, name: str, queue: Queue, emb_type):
 EMBEDDERS = [(_jukemir_embed, "JukeMIR", QueueJukeMIR, EmbeddingJukeMIR),
              (_auditus_embed, "Auditus", QueueAuditus, EmbeddingAuditus)]
 PROCESSES = []
-def start_processes(selection: list[QueueObject] = []) -> list[SongQueue]:
+def start_processes() -> list[SongQueue]:
     queues = []
     for embed_func, name, q_type, emb_type in EMBEDDERS:
-        if selection and q_type not in selection:
-            continue
-
         q = SongQueue(name, q_type)
         queues.append(q)
 
-        process = threading.Thread(
+        process = mp.Process(
             target=_embed_wrapper, 
             args=(embed_func, name, q, emb_type)
         )
-        process.daemon = True
         PROCESSES.append(process)
         process.start()
 
