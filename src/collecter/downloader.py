@@ -13,9 +13,7 @@ from db import get_session, setup
 
 from spotdl.types.options import DownloaderOptions
 
-from collecter.embedders import SongQueue
-from collecter.metadata import simple_queue_new_music
-
+from collecter.embedders import SongQueue, QUEUE_MAX_LEN
 from collecter.metadata import (
     simple_queue_new_music, 
     create_push_track,
@@ -111,7 +109,6 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
         CURRENTLY_DOWNLOADING.remove(spotify_id)
 
-QUEUE_MAX_LEN = 5
 async def start_download_loop(song_queues: list[SongQueue]):
     global DOWNLOAD_LOC
     DOWNLOAD_LOC = "./mock_downloads" if os.getenv("TEST_MODE") else "./downloads"

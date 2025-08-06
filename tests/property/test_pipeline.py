@@ -1,17 +1,18 @@
 import pytest
 import asyncio
 import time
+
 import os
+os.environ["TEST_MODE"] = "true"
+os.environ["POSTGRES_DB"] = "test_db"
+
+
 from hypothesis import given, settings
 from sqlalchemy import select, func
 
 from tests.strategies.queue import queue_strat, setup_queue
 from tests.strategies.apis import spotify_id_strat
 from tests.conftest import get_clean_session
-
-os.environ["TEST_MODE"] = "true"
-os.environ["POSTGRES_DB"] = "test_db"
-
 from collecter.embedders import SongQueue, start_processes, QueueObject
 from collecter.downloader import QUEUE_MAX_LEN
 from models import QueueAuditus, QueueJukeMIR

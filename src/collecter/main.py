@@ -12,8 +12,8 @@ if os.getenv("TEST_MODE"):
 
 LOGGER.info("Starting imports...")
 
-import multiprocessing as mp
-mp.set_start_method('spawn', force=True)
+# import multiprocessing as mp
+# mp.set_start_method('spawn', force=True)
 
 from db import setup, get_session
 import traceback
@@ -61,6 +61,6 @@ async def main():
         end_processes()
 
 if __name__ == "__main__":
-    mp.freeze_support()
+    # mp.freeze_support()
     asyncio.run(main())
 

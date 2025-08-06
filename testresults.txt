@@ -14,7 +14,7 @@ tests/property/test_pipeline.py::test_queue_processes_all_and_cleans FAILED [100
 =================================== FAILURES ===================================
 _____________________ test_queue_processes_all_and_cleans ______________________
   + Exception Group Traceback (most recent call last):
-  |   File "/mnt/storage/nc/Personal/Projects/suggest/tests/property/test_pipeline.py", line 26, in test_queue_processes_all_and_cleans
+  |   File "/mnt/storage/nc/Personal/Projects/suggest/tests/property/test_pipeline.py", line 27, in test_queue_processes_all_and_cleans
   |     @pytest.mark.slow
   |                    ^^^
   |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/hypothesis/core.py", line 2120, in wrapped_test
@@ -22,18 +22,111 @@ _____________________ test_queue_processes_all_and_cleans ______________________
   | ExceptionGroup: Hypothesis found 2 distinct failures. (2 sub-exceptions)
   +-+---------------- 1 ----------------
     | Traceback (most recent call last):
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 545, in _prepare_and_execute
+    |     self._rows = deque(await prepared_stmt.fetch(*parameters))
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/asyncpg/connresource.py", line 19, in _check
+    |     self._check_conn_validity(meth.__name__)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/asyncpg/prepared_stmt.py", line 281, in _check_conn_validity
+    |     super()._check_conn_validity(meth_name)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/asyncpg/connresource.py", line 41, in _check_conn_validity
+    |     raise exceptions.InterfaceError(
+    | asyncpg.exceptions._base.InterfaceError: cannot call PreparedStatement.fetch(): the underlying connection is closed
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1961, in _exec_single_context
+    |     self.dialect.do_execute(
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 944, in do_execute
+    |     cursor.execute(statement, parameters)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 580, in execute
+    |     self._adapt_connection.await_(
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    |     return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    |     value = await result
+    |             ^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 558, in _prepare_and_execute
+    |     self._handle_exception(error)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 508, in _handle_exception
+    |     self._adapt_connection._handle_exception(error)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 792, in _handle_exception
+    |     raise translated_error from error
+    | sqlalchemy.dialects.postgresql.asyncpg.AsyncAdapt_asyncpg_dbapi.InterfaceError: <class 'asyncpg.exceptions._base.InterfaceError'>: cannot call PreparedStatement.fetch(): the underlying connection is closed
+    | 
+    | The above exception was the direct cause of the following exception:
+    | 
+    | Traceback (most recent call last):
     |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/pytest_asyncio/plugin.py", line 642, in inner
     |     _loop.run_until_complete(task)
     |   File "/nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
     |     return future.result()
     |            ^^^^^^^^^^^^^^^
-    |   File "/mnt/storage/nc/Personal/Projects/suggest/tests/property/test_pipeline.py", line 46, in test_queue_processes_all_and_cleans
-    |     assert final_count == 0
-    | AssertionError: assert 14220 == 0
+    |   File "/mnt/storage/nc/Personal/Projects/suggest/tests/property/test_pipeline.py", line 40, in test_queue_processes_all_and_cleans
+    |     count = await n_items_in_queue_table(q.q_type, session)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/mnt/storage/nc/Personal/Projects/suggest/tests/property/test_pipeline.py", line 21, in n_items_in_queue_table
+    |     result = await session.execute(select(func.count(q_type.spotify_id)))
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/session.py", line 463, in execute
+    |     result = await greenlet_spawn(
+    |              ^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 203, in greenlet_spawn
+    |     result = context.switch(value)
+    |              ^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2365, in execute
+    |     return self._execute_internal(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2251, in _execute_internal
+    |     result: Result[Any] = compile_state_cls.orm_execute_statement(
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    |     result = conn.execute(
+    |              ^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1413, in execute
+    |     return meth(
+    |            ^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    |     return connection._execute_clauseelement(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1635, in _execute_clauseelement
+    |     ret = self._execute_context(
+    |           ^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1840, in _execute_context
+    |     return self._exec_single_context(
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1980, in _exec_single_context
+    |     self._handle_dbapi_exception(
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2349, in _handle_dbapi_exception
+    |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1961, in _exec_single_context
+    |     self.dialect.do_execute(
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 944, in do_execute
+    |     cursor.execute(statement, parameters)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 580, in execute
+    |     self._adapt_connection.await_(
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    |     return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    |     value = await result
+    |             ^^^^^^^^^^^^
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 558, in _prepare_and_execute
+    |     self._handle_exception(error)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 508, in _handle_exception
+    |     self._adapt_connection._handle_exception(error)
+    |   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 792, in _handle_exception
+    |     raise translated_error from error
+    | sqlalchemy.exc.InterfaceError: (sqlalchemy.dialects.postgresql.asyncpg.InterfaceError) <class 'asyncpg.exceptions._base.InterfaceError'>: cannot call PreparedStatement.fetch(): the underlying connection is closed
+    | [SQL: SELECT count(queue_jukemir.spotify_id) AS count_1 
+    | FROM queue_jukemir]
+    | (Background on this error at: https://sqlalche.me/e/20/rvf5)
     | Falsifying example: test_queue_processes_all_and_cleans(
-    |     test_db_manager=<db.DatabaseManager object at 0x7fffc2854fe0>,
+    |     test_db_manager=<db.DatabaseManager object at 0x7fffc29dac30>,
     |     q_data={'q_type': models.QueueJukeMIR,
-    |      'q_items': [<models.QueueJukeMIR object at 0x7fffc18824e0>],
+    |      'q_items': [<models.QueueJukeMIR object at 0x7fffc19c6c30>],
     |      'fill_via_db': False},
     | )
     +---------------- 2 ----------------
@@ -43,102 +136,148 @@ _____________________ test_queue_processes_all_and_cleans ______________________
     |   File "/nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
     |     return future.result()
     |            ^^^^^^^^^^^^^^^
-    |   File "/mnt/storage/nc/Personal/Projects/suggest/tests/property/test_pipeline.py", line 46, in test_queue_processes_all_and_cleans
+    |   File "/mnt/storage/nc/Personal/Projects/suggest/tests/property/test_pipeline.py", line 47, in test_queue_processes_all_and_cleans
     |     assert final_count == 0
-    | AssertionError: assert 14220 == 0
+    | AssertionError: assert 14206 == 0
     | Falsifying example: test_queue_processes_all_and_cleans(
-    |     test_db_manager=<db.DatabaseManager object at 0x7fffc2854fe0>,
+    |     test_db_manager=<db.DatabaseManager object at 0x7fffc29dac30>,
     |     q_data={'q_type': models.QueueJukeMIR,
     |      'q_items': [],
     |      'fill_via_db': False},
     | )
     +------------------------------------
 ---------------------------- Captured stderr setup -----------------------------
-[17:59:23] DEBUG [__name__-receive_connect:82] New database connection established
-[17:59:23] DEBUG [__name__-receive_checkout:86] Connection checked out from pool
-[17:59:23] INFO [__name__-initialize:91] Database connection test successful
-[17:59:23] INFO [__name__-initialize:103] Database engine and session factory initialized successfully
-[17:59:23] DEBUG [__name__-receive_checkout:86] Connection checked out from pool
+[19:02:58] DEBUG [__name___1507424-_log_message:92] New database connection established
+[19:02:58] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
+[19:02:58] INFO [__name___1507424-_log_message:92] Database connection test successful
+[19:02:58] INFO [__name___1507424-_log_message:92] Database engine and session factory initialized successfully
+[19:02:58] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
 ----------------------------- Captured stderr call -----------------------------
-[17:59:24] DEBUG [__name__-receive_connect:82] New database connection established
-[17:59:24] DEBUG [__name__-receive_checkout:86] Connection checked out from pool
-[17:59:24] INFO [__name__-_download:56] Starting download for: BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6
-[17:59:24] INFO [__name__-_async_embed_wrapper:189] JukeMIR embedding loop started.
-[17:59:24] INFO [__name__-setup:186] Initializing DB engine.
-[17:59:24] DEBUG [__name__-spotdl_lazy_load:39] Initializing mock Spotdl client.
-[17:59:24] INFO [__name__-_download:78] Song found for 'BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6: Halleluhwah by CAN
-[17:59:24] DEBUG [__name__-receive_connect:82] New database connection established
-[17:59:24] DEBUG [__name__-receive_checkout:86] Connection checked out from pool
-[17:59:24] INFO [__name__-initialize:91] Database connection test successful
-[17:59:24] INFO [__name__-initialize:103] Database engine and session factory initialized successfully
-[17:59:24] INFO [__name__-setup:188] DB connection initialized.
-[17:59:24] DEBUG [__name__-_download:96] Renaming 'mock_downloads/CAN - Halleluhwah.wav' to 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav'.
-[17:59:24] DEBUG [__name__-_download:101] Download completed: mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav (3.66 MB).
-[17:59:24] DEBUG [__name__-_download:103] Adding mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav to processing queues.
-[17:59:24] INFO [__name__-_download:107] Downloading song 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' successful.
-[17:59:24] INFO [__name__-get_session:118] DB not initialized yet, doing that now.
-[17:59:24] DEBUG [__name__-receive_connect:82] New database connection established
-[17:59:24] DEBUG [__name__-receive_checkout:86] Connection checked out from pool
-[17:59:24] INFO [__name__-initialize:91] Database connection test successful
-[17:59:24] INFO [__name__-initialize:103] Database engine and session factory initialized successfully
-[17:59:24] ERROR [__name__-get_session:133] Session error, rolling back: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-[17:59:25] ERROR [__name__-get_session:133] Session error, rolling back: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-[17:59:25] ERROR [__name__-get_session:133] Session error, rolling back: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-[17:59:25] WARNING [__name__-_async_embed_wrapper:222] Embedding 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' using JukeMIR failed: Traceback (most recent call last):
+[19:02:59] DEBUG [__name___1507424-_log_message:92] New database connection established
+[19:02:59] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
+[19:02:59] INFO [__name___1507424-_log_message:92] Starting download for: BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6
+[19:02:59] INFO [__name___1507424-_log_message:92] JukeMIR embedding loop started.
+[19:02:59] INFO [__name___1507424-_log_message:92] Initializing DB engine.
+[19:02:59] DEBUG [__name___1507424-_log_message:92] Initializing mock Spotdl client.
+[19:02:59] INFO [__name___1507424-_log_message:92] Song found for 'BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6: Halleluhwah by CAN
+[19:02:59] DEBUG [__name___1507424-_log_message:92] New database connection established
+[19:02:59] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
+[19:02:59] INFO [__name___1507424-_log_message:92] Database connection test successful
+[19:02:59] INFO [__name___1507424-_log_message:92] Database engine and session factory initialized successfully
+[19:02:59] INFO [__name___1507424-_log_message:92] DB connection initialized.
+[19:02:59] DEBUG [__name___1507424-_log_message:92] Renaming 'mock_downloads/CAN - Halleluhwah.wav' to 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav'.
+[19:02:59] DEBUG [__name___1507424-_log_message:92] Download completed: mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav (3.66 MB).
+[19:02:59] DEBUG [__name___1507424-_log_message:92] Adding mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav to processing queues.
+[19:02:59] INFO [__name___1507424-_log_message:92] Downloading song 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' successful.
+[19:03:00] INFO [__name___1507424-_log_message:92] Adding song Spoon with metadata.
+[19:03:00] DEBUG [__name___1507424-_log_message:92] Checking Song for spotify_id=BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6: Found
+[19:03:00] INFO [__name___1507424-_log_message:92] Song Spoon already exists.
+[19:03:01] INFO [__name___1507424-_log_message:92] Adding song Spoon with metadata.
+[19:03:01] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
+[19:03:01] DEBUG [__name___1507424-_log_message:92] Checking Song for spotify_id=BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6: Found
+[19:03:01] INFO [__name___1507424-_log_message:92] Song Spoon already exists.
+[19:03:01] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
+[19:03:01] WARNING [__name___1507424-_log_message:92] About to embed Spoon using JukeMIR, but it's already embedded.
+[19:03:01] DEBUG [__name___1507424-_log_message:92] Pushed JukeMIR embeddings of 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' to DB.
+[19:03:01] INFO [__name___1507424-_log_message:92] Embedding 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' using JukeMIR successful.
+[19:03:29] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
+[19:03:29] INFO [__name___1507424-_log_message:92] Starting download for: BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6
+[19:03:29] INFO [__name___1507424-_log_message:92] Song found for 'BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6: Halleluhwah by CAN
+[19:03:29] INFO [__name___1507424-_log_message:92] JukeMIR embedding loop started.
+[19:03:29] INFO [__name___1507424-_log_message:92] Initializing DB engine.
+[19:03:29] DEBUG [__name___1507424-_log_message:92] Database already initialized
+[19:03:29] INFO [__name___1507424-_log_message:92] DB connection initialized.
+[19:03:29] DEBUG [__name___1507424-_log_message:92] Renaming 'mock_downloads/CAN - Halleluhwah.wav' to 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav'.
+[19:03:29] DEBUG [__name___1507424-_log_message:92] Download completed: mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav (3.66 MB).
+[19:03:29] DEBUG [__name___1507424-_log_message:92] Adding mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav to processing queues.
+[19:03:29] INFO [__name___1507424-_log_message:92] Downloading song 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' successful.
+[19:03:30] INFO [__name___1507424-_log_message:92] Adding song Spoon with metadata.
+[19:03:30] DEBUG [__name___1507424-_log_message:92] Checking Song for spotify_id=BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6: Found
+[19:03:30] INFO [__name___1507424-_log_message:92] Song Spoon already exists.
+[19:03:31] INFO [__name___1507424-_log_message:92] Adding song Spoon with metadata.
+[19:03:31] WARNING [__name___1507424-_log_message:92] Embedding 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' using JukeMIR failed: Traceback (most recent call last):
   File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/embedders.py", line 200, in _async_embed_wrapper
     song = await create_push_track(spotify_id)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 271, in inner
     return await func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 504, in create_push_track
-    track = sp.track(spotify_id)
-            ^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 371, in track
-    trid = self._get_id("track", track_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 2055, in _get_id
-    raise SpotifyException(400, -1, "Unsupported URL / URI.")
-spotipy.exceptions.SpotifyException: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-
-[17:59:54] DEBUG [__name__-receive_checkout:86] Connection checked out from pool
-[17:59:54] INFO [__name__-_download:56] Starting download for: BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6
-[17:59:54] INFO [__name__-_download:78] Song found for 'BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6: Halleluhwah by CAN
-[17:59:54] INFO [__name__-_async_embed_wrapper:189] JukeMIR embedding loop started.
-[17:59:54] INFO [__name__-setup:186] Initializing DB engine.
-[17:59:54] DEBUG [__name__-initialize:49] Database already initialized
-[17:59:54] INFO [__name__-setup:188] DB connection initialized.
-[17:59:54] DEBUG [__name__-_download:96] Renaming 'mock_downloads/CAN - Halleluhwah.wav' to 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav'.
-[17:59:54] DEBUG [__name__-_download:101] Download completed: mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav (3.66 MB).
-[17:59:54] DEBUG [__name__-_download:103] Adding mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav to processing queues.
-[17:59:54] INFO [__name__-_download:107] Downloading song 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' successful.
-[17:59:54] ERROR [__name__-get_session:133] Session error, rolling back: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-[17:59:55] ERROR [__name__-get_session:133] Session error, rolling back: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-[17:59:55] ERROR [__name__-get_session:133] Session error, rolling back: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-[17:59:55] WARNING [__name__-_async_embed_wrapper:222] Embedding 'mock_downloads/BDu0eOvtUiesiOtT0ivPVwE¢¬]񻣒'Xý6 CAN - Halleluhwah.wav' using JukeMIR failed: Traceback (most recent call last):
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/embedders.py", line 200, in _async_embed_wrapper
-    song = await create_push_track(spotify_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 271, in inner
+  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 507, in create_push_track
+    if song := await check_in_table(Song, Song.spotify_id, spotify_id, session=session):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 267, in inner
     return await func(*args, **kwargs)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 504, in create_push_track
-    track = sp.track(spotify_id)
-            ^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 371, in track
-    trid = self._get_id("track", track_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 2055, in _get_id
-    raise SpotifyException(400, -1, "Unsupported URL / URI.")
-spotipy.exceptions.SpotifyException: http status: 400, code: -1 - Unsupported URL / URI., reason: None
+  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 278, in check_in_table
+    result = await session.execute(select(table).where(col == value).limit(1))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/ext/asyncio/session.py", line 463, in execute
+    result = await greenlet_spawn(
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 201, in greenlet_spawn
+    result = context.throw(*sys.exc_info())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2365, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 2251, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1413, in execute
+    return meth(
+           ^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1635, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1840, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1980, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2352, in _handle_dbapi_exception
+    raise exc_info[1].with_traceback(exc_info[2])
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1961, in _exec_single_context
+    self.dialect.do_execute(
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 944, in do_execute
+    cursor.execute(statement, parameters)
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 580, in execute
+    self._adapt_connection.await_(
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 132, in await_only
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return,attr-defined] # noqa: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/util/_concurrency_py3k.py", line 196, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 515, in _prepare_and_execute
+    await adapt_connection._start_transaction()
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 845, in _start_transaction
+    self._handle_exception(error)
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 794, in _handle_exception
+    raise error
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 843, in _start_transaction
+    await self._transaction.start()
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/asyncpg/transaction.py", line 146, in start
+    await self._connection.execute(query)
+  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/asyncpg/connection.py", line 349, in execute
+    result = await self._protocol.query(query, timeout)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "asyncpg/protocol/protocol.pyx", line 375, in query
+RuntimeError: Task <Task pending name='Task-10' coro=<_async_embed_wrapper() running at /mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/embedders.py:200> cb=[_run_until_complete_cb() at /nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/lib/python3.12/asyncio/base_events.py:181]> got Future <Future pending cb=[BaseProtocol._on_waiter_completed()]> attached to a different loop
 
-[18:00:24] DEBUG [__name__-receive_checkout:86] Connection checked out from pool
-[18:00:24] INFO [__name__-_async_embed_wrapper:189] JukeMIR embedding loop started.
-[18:00:24] INFO [__name__-setup:186] Initializing DB engine.
-[18:00:24] DEBUG [__name__-initialize:49] Database already initialized
-[18:00:24] INFO [__name__-setup:188] DB connection initialized.
+[19:03:31] DEBUG [__name___1507424-_log_message:92] New database connection established
+[19:03:31] DEBUG [__name___1507424-_log_message:92] Connection checked out from pool
+[19:03:31] INFO [__name___1507424-_log_message:92] JukeMIR embedding loop started.
+[19:03:31] INFO [__name___1507424-_log_message:92] Initializing DB engine.
+[19:03:31] DEBUG [__name___1507424-_log_message:92] Database already initialized
+[19:03:31] INFO [__name___1507424-_log_message:92] DB connection initialized.
 ------------------------------ Captured log call -------------------------------
-ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:376 Exception terminating connection <AdaptedConnection <asyncpg.connection.Connection object at 0x7fffc24d9130>>
+ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:376 Exception terminating connection <AdaptedConnection <asyncpg.connection.Connection object at 0x7fffc28fea80>>
 Traceback (most recent call last):
   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 372, in _close_connection
     self._dialect.do_terminate(connection)
@@ -156,40 +295,31 @@ Traceback (most recent call last):
     await self._protocol.close(timeout)
   File "asyncpg/protocol/protocol.pyx", line 628, in close
 RuntimeError: Task <Task pending name='Task-5' coro=<Connection.close() running at /nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/asyncpg/connection.py:1504> cb=[shield.<locals>._inner_done_callback() at /nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/lib/python3.12/asyncio/tasks.py:905]> got Future <Future pending> attached to a different loop
-ERROR    asyncio:base_events.py:1833 Task exception was never retrieved
-future: <Task finished name='Task-8' coro=<pass_session_capable.<locals>.inner() done, defined at /mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py:265> exception=SpotifyException(400, -1, 'Unsupported URL / URI.')>
+ERROR    asyncio:base_events.py:1833 Fatal error: protocol.data_received() call failed.
+protocol: <asyncpg.protocol.protocol.Protocol object at 0x7fffc134c050>
+transport: <_SelectorSocketTransport fd=22 read=polling write=<idle, bufsize=0>>
 Traceback (most recent call last):
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 271, in inner
-    return await func(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 504, in create_push_track
-    track = sp.track(spotify_id)
-            ^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 371, in track
-    trid = self._get_id("track", track_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 2055, in _get_id
-    raise SpotifyException(400, -1, "Unsupported URL / URI.")
-spotipy.exceptions.SpotifyException: http status: 400, code: -1 - Unsupported URL / URI., reason: None
-ERROR    asyncio:base_events.py:1833 Task exception was never retrieved
-future: <Task finished name='Task-11' coro=<pass_session_capable.<locals>.inner() done, defined at /mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py:265> exception=SpotifyException(400, -1, 'Unsupported URL / URI.')>
+  File "asyncpg/protocol/coreproto.pyx", line 136, in asyncpg.protocol.protocol.CoreProtocol._read_server_messages
+  File "asyncpg/protocol/coreproto.pyx", line 809, in asyncpg.protocol.protocol.CoreProtocol._push_result
+  File "asyncpg/protocol/protocol.pyx", line 928, in asyncpg.protocol.protocol.BaseProtocol._on_result
+  File "asyncpg/protocol/protocol.pyx", line 850, in asyncpg.protocol.protocol.BaseProtocol._dispatch_result
+AttributeError: 'NoneType' object has no attribute 'cancelled'
+
+During handling of the above exception, another exception occurred:
+
 Traceback (most recent call last):
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 271, in inner
-    return await func(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/mnt/storage/nc/Personal/Projects/suggest/tests/../src/collecter/metadata.py", line 504, in create_push_track
-    track = sp.track(spotify_id)
-            ^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 371, in track
-    trid = self._get_id("track", track_id)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/spotipy/client.py", line 2055, in _get_id
-    raise SpotifyException(400, -1, "Unsupported URL / URI.")
-spotipy.exceptions.SpotifyException: http status: 400, code: -1 - Unsupported URL / URI., reason: None
+  File "/nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/lib/python3.12/asyncio/selector_events.py", line 1027, in _read_ready__data_received
+    self._protocol.data_received(data)
+  File "asyncpg/protocol/protocol.pyx", line 976, in asyncpg.protocol.protocol.BaseProtocol.data_received
+  File "asyncpg/protocol/coreproto.pyx", line 157, in asyncpg.protocol.protocol.CoreProtocol._read_server_messages
+  File "asyncpg/protocol/coreproto.pyx", line 809, in asyncpg.protocol.protocol.CoreProtocol._push_result
+  File "asyncpg/protocol/protocol.pyx", line 928, in asyncpg.protocol.protocol.BaseProtocol._on_result
+  File "asyncpg/protocol/protocol.pyx", line 850, in asyncpg.protocol.protocol.BaseProtocol._dispatch_result
+AttributeError: 'NoneType' object has no attribute 'cancelled'
 --------------------------- Captured stderr teardown ---------------------------
-[18:00:54] INFO [__name__-cleanup:149] Database engine disposed
+[19:04:01] INFO [__name___1507424-_log_message:92] Database engine disposed
 ---------------------------- Captured log teardown -----------------------------
-ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:376 Exception closing connection <AdaptedConnection <asyncpg.connection.Connection object at 0x7fffc1820320>>
+ERROR    sqlalchemy.pool.impl.AsyncAdaptedQueuePool:base.py:376 Exception closing connection <AdaptedConnection <asyncpg.connection.Connection object at 0x7fffc0e407d0>>
 Traceback (most recent call last):
   File "/nix/store/zyn0gyjqwihaqsbyz5hg0dpimmkj1slr-hello-world-dev-env/lib/python3.12/site-packages/sqlalchemy/pool/base.py", line 374, in _close_connection
     self._dialect.do_close(connection)
@@ -240,10 +370,10 @@ tests/property/test_pipeline.py::test_queue_processes_all_and_cleans
 tests/property/test_pipeline.py::test_queue_processes_all_and_cleans
 tests/property/test_pipeline.py::test_queue_processes_all_and_cleans
 tests/property/test_pipeline.py::test_queue_processes_all_and_cleans
-  /nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=1211598) is multi-threaded, use of fork() may lead to deadlocks in the child.
+  /nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=1507424) is multi-threaded, use of fork() may lead to deadlocks in the child.
     self.pid = os.fork()
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
 FAILED tests/property/test_pipeline.py::test_queue_processes_all_and_cleans
-=================== 1 failed, 8 warnings in 93.46s (0:01:33) ===================
+=================== 1 failed, 8 warnings in 65.02s (0:01:05) ===================

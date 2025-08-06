@@ -27,10 +27,17 @@ class DatabaseManager:
     _session_factory: Optional[async_sessionmaker] = None
     _initialized: bool = False
     _test_session: Optional[AsyncSession] = None
+    _process_id: Optional[int] = None
     
-    def __new__(cls) -> 'DatabaseManager':
-        if cls._instance is None:
+    def __new__(cls, force_new_instance: bool = False) -> 'DatabaseManager':
+        # Add this check
+        current_pid = os.getpid()
+        if (cls._instance is None or 
+            force_new_instance or 
+            (cls._process_id is not None and cls._process_id != current_pid)):
             cls._instance = super().__new__(cls)
+            cls._process_id = current_pid
+            cls._initialized = False  # Reset initialization for new process
         return cls._instance
     
     def create_database_url(self) -> URL:
@@ -166,31 +173,37 @@ class DatabaseManager:
         LOGGER.info("Database tables created successfully")
 
 # Global instance
-db_manager = DatabaseManager()
+db_manager = None
+
+def get_db_manager():
+    global db_manager
+    if db_manager is None:
+        db_manager = DatabaseManager()
+    return db_manager
 
 # Convenience functions that maintain backward compatibility
 async def init_db():
     """Initialize database - wrapper for backward compatibility"""
-    await db_manager.initialize()
+    await get_db_manager().initialize()
 
 async def setup_tables():
     """Setup tables - wrapper for backward compatibility"""
-    await db_manager.setup_tables()
+    await get_db_manager().setup_tables()
 
 def get_session():
     """Get session context manager"""
-    return db_manager.get_session()
+    return get_db_manager().get_session()
 
 async def setup():
     """Setup database connection"""
     LOGGER.info("Initializing DB engine.")
-    await db_manager.initialize()
+    await get_db_manager().initialize()
     LOGGER.info("DB connection initialized.")
 
 # Graceful shutdown function
 async def shutdown_db():
     """Gracefully shutdown database connections"""
-    await db_manager.cleanup()
+    await get_db_manager().cleanup()
 
 
 async def get_embeddings(emb_type) -> np.ndarray:  # Structured array (basically a better dict.)
