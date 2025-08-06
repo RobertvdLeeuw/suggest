@@ -133,6 +133,11 @@ async def start_download_loop(song_queues: list[SongQueue]):
                                                   .order_by(q.q_type.created_at.asc())
                                                   .limit(n))
                     queue_items = queue_items.scalars().all()
+                    LOGGER.debug(f"Found {len(queue_items)} queue items for {q.name}.")
+
+                if len(queue_items) < n:
+                    LOGGER.info(F"Queue of {q.name} almost empty, collecting new music (once implemented).")
+                    # asyncio.create_task(simple_queue_new_music())
 
                 for db_q_item in list(queue_items):
                     if db_q_item in CURRENTLY_DOWNLOADING:
@@ -155,10 +160,6 @@ async def start_download_loop(song_queues: list[SongQueue]):
 
                 _ = asyncio.gather(*[_download(q_item, q) for q_item in queue_items])
 
-                if len(queue_items) < n:
-                    LOGGER.info(F"Queue of {q.name} almost empty, collecting new music (once implemented).")
-                    # await _add_to_db_queue(_get_sp_album_tracks("2zQeigA4bFAlTqQqBiVe6Y"))
-                    # await simple_queue_new_music()  # TODO: Background task
 
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
@@ -172,7 +173,7 @@ def clean_downloads(song_queues: list):
     cnt = 0
     q_spotify_ids = [x[1] for q in song_queues for x in q.peek_all()]
     for file in os.listdir(DOWNLOAD_LOC):
-        for sp_id in CURRENTLY_DOWNLOADING + q_spotify_ids:  # Still in the process.
+        for sp_id in set(list(CURRENTLY_DOWNLOADING) + q_spotify_ids):  # Still in the process.
             LOGGER.debug(f"Checking if {sp_id} in {file}")
             if sp_id in file:
                 continue

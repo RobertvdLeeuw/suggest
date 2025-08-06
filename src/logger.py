@@ -22,6 +22,7 @@ def setup_multiprocess_logging(log_path: str = None):
     
     # Create console handler
     console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO) 
     
     # Set formatter
     formatter = logging.Formatter(
@@ -39,9 +40,22 @@ def setup_multiprocess_logging(log_path: str = None):
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
     
-    # Disable SQLAlchemy verbose logging
-    for logger_name in ['sqlalchemy.engine', 'sqlalchemy.dialects', 
-                       'sqlalchemy.pool', 'sqlalchemy.orm']:
-        logging.getLogger(logger_name).setLevel(logging.WARNING)
+    for logger_name in ["sqlalchemy.engine", "sqlalchemy.dialects", "sqlalchemy.pool", 
+                        "sqlalchemy.orm", "httpcore", "h5py", "urllib3.connectionpool", 
+                        "numba.core.ssa"]:  # TODO: Make this actually work.
+        l = logging.getLogger(logger_name)
+        l.setLevel(logging.DEBUG)
+        
+        l.handlers.clear()
+        l.propagate = False
+        
+        if logger_name != "numba.core.ssa":
+            l.addHandler(file_handler)
+        
+        console_warning = logging.StreamHandler()
+        console_warning.setLevel(logging.WARNING) 
+        console_warning.setFormatter(formatter)
+        l.addHandler(console_warning)
+    
     
     logging.info(f"Logging initialized (PID: {os.getpid()})")
