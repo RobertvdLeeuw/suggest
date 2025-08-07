@@ -120,7 +120,7 @@ async def start_download_loop(song_queues: list[SongQueue]):
     global DOWNLOAD_LOC
     DOWNLOAD_LOC = "./mock_downloads" if os.getenv("TEST_MODE") else "./downloads"
 
-    LOGGER.info(f"Download loop started.")
+    LOGGER.info(f"Download loop started ({DOWNLOAD_LOC}).")
 
     while True:
         await asyncio.sleep(1)
@@ -175,6 +175,9 @@ async def start_download_loop(song_queues: list[SongQueue]):
 
     
 def clean_downloads(song_queues: list):
+    global DOWNLOAD_LOC
+    DOWNLOAD_LOC = "./mock_downloads" if os.getenv("TEST_MODE") else "./downloads"
+
     LOGGER.info(f"Cleaning downloads folder ({DOWNLOAD_LOC}), {len(os.listdir(DOWNLOAD_LOC))} downloaded files.")
 
     cnt = 0

@@ -26,7 +26,6 @@ class DatabaseManager:
     _engine: Optional[AsyncEngine] = None
     _session_factory: Optional[async_sessionmaker] = None
     _initialized: bool = False
-    _test_session: Optional[AsyncSession] = None
     
     def __new__(cls) -> 'DatabaseManager':
         if cls._instance is None:
@@ -35,13 +34,22 @@ class DatabaseManager:
     
     
     def create_database_url(self) -> URL:
+        if test_db := os.environ.get("TEST_DATABASE_NAME"):
+            database_name = test_db
+        elif os.getenv("TEST_MODE"):
+            database_name = "test_db"
+        else:
+            database_name = os.environ.get("POSTGRES_DB", "db")
+
+        LOGGER.info(f"Using database '{database_name}'.")
+
         return URL.create(
             drivername='postgresql+asyncpg',
             username=os.environ["POSTGRES_USER"],
             password=os.environ["POSTGRES_PASSWORD"],
             host=os.environ["POSTGRES_HOST"],
             port=int(os.environ["DB_PORT"]),
-            database= "test_db" if os.getenv("TEST_MODE") else os.environ.get("POSTGRES_DB", "db")
+            database=database_name
         )
     
     async def initialize(self) -> None:
@@ -108,9 +116,6 @@ class DatabaseManager:
             await self.cleanup()
             raise Exception(f"Database initialization failed: {str(e)}")
 
-    def set_test_session(self, session: Optional[AsyncSession]):
-        """Set a test session to override normal session creation."""
-        self._test_session = session
 
     @contextlib.asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
@@ -119,12 +124,6 @@ class DatabaseManager:
             LOGGER.info("DB not initialized yet, doing that now.")
             await self.initialize()
         
-        # If test session is set, use it but don't manage its lifecycle
-        if self._test_session is not None:
-            yield self._test_session
-            return
-        
-        # Normal production behavior
         session = self._session_factory()
         try:
             yield session

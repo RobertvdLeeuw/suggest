@@ -6,15 +6,17 @@ import os
 os.environ["TEST_MODE"] = "true"
 os.environ["POSTGRES_DB"] = "test_db"
 
+from logger import setup_multiprocess_logging
+setup_multiprocess_logging()
 
 from hypothesis import given, settings
 from sqlalchemy import select, func
 
 from tests.strategies.queue import queue_strat, setup_queue
 from tests.strategies.apis import spotify_id_strat
-from tests.conftest import get_clean_session
+from tests.conftest import get_isolated_test_db
 from collecter.embedders import SongQueue, start_processes, QueueObject
-from collecter.downloader import QUEUE_MAX_LEN
+from collecter.downloader import QUEUE_MAX_LEN, clean_downloads, start_download_loop
 from models import QueueAuditus, QueueJukeMIR
 
 async def n_items_in_queue_table(q_type: QueueObject, session):
@@ -23,32 +25,35 @@ async def n_items_in_queue_table(q_type: QueueObject, session):
 
 pytestmark = pytest.mark.collecter
 
-@pytest.mark.asyncio
+# @pytest.mark.asyncio
 @pytest.mark.slow
 @given(q_data=queue_strat(fill_via_db=False))
 @settings(max_examples=1, deadline=60000)  # Increase deadline for async operations
-async def test_queue_processes_all_and_cleans(q_data, test_db_manager):
+async def test_queue_processes_all_and_cleans(q_data):
     """Given a queue with n items + embedder, all items will be processed eventually 
        AND downloaded files will be removed."""
 
-    async with get_clean_session(test_db_manager) as session:
-        q = await setup_queue(q_data, session)
+    async with get_isolated_test_db() as test_db_manager:
+        async with test_db_manager.get_session() as session:
+            q = await setup_queue(q_data, session)
 
-        timeout = time.time() + 30
-        while time.time() < timeout:
+            # asyncio.create_task(start_download_loop([q]))
+
+            timeout = time.time() + 30
+            while time.time() < timeout:
+                await session.commit()
+                count = await n_items_in_queue_table(q.q_type, session)
+                if count == 0:
+                    break
+                await asyncio.sleep(0.1)
+
             await session.commit()
-            count = await n_items_in_queue_table(q.q_type, session)
-            if count == 0:
-                break
-            await asyncio.sleep(0.1)
+            final_count = await n_items_in_queue_table(q.q_type, session)
+            assert final_count == 0
+            assert len(q) == 0
 
-        await session.commit()
-        final_count = await n_items_in_queue_table(q.q_type, session)
-        assert final_count == 0
-        assert len(q) == 0
-
-        await asyncio.sleep(3)
-        assert len(os.listdir("./mock_downloads")) == 0
+            await asyncio.sleep(3)
+            assert len(os.listdir("./mock_downloads")) == 0
 
 # @given(queue_strat(fill_via_db=False))
 # @settings(max_examples=5)

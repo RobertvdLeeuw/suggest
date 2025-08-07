@@ -37,7 +37,7 @@ import traceback
 
 import asyncio
 import threading
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from collecter.embedders import start_processes, end_processes
 from collecter.downloader import start_download_loop, clean_downloads
@@ -62,7 +62,7 @@ async def main():
 
         song_queues = start_processes()
         
-        scheduler = AsyncIOScheduler()
+        scheduler = BackgroundScheduler()
         scheduler.add_job(clean_downloads, 'interval', minutes=1, args=(song_queues,))
         scheduler.add_job(refresh_spotipy, 'interval', minutes=55)  # Race issues?
         scheduler.start()

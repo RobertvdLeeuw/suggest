@@ -39,7 +39,7 @@ def queue_strat(draw, q_type: QueueObject = None, *,
 async def setup_queue(queue_data, session):
     from collecter.embedders import start_processes
     from collecter.downloader import start_download_loop, clean_downloads, _download
-    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.schedulers.background import BackgroundScheduler
     
     q = start_processes([queue_data['q_type']])[0]
     
@@ -50,11 +50,15 @@ async def setup_queue(queue_data, session):
         
         asyncio.create_task(start_download_loop([q]))
         
-        scheduler = AsyncIOScheduler()
-        scheduler.add_job(clean_downloads, 'interval', seconds=0.1, args=([q],))
+        clean_downloads([q])
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(clean_downloads, 'interval', seconds=1, args=([q],))
         scheduler.start()
     else:
         for i, item in enumerate(queue_data['q_items'][:QUEUE_MAX_LEN]):
             await _download(item.spotify_id, q)
     
     return q
+
+    # yield q
+    # scheduler.shutdown()
