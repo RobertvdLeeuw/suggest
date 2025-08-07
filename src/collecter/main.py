@@ -7,9 +7,23 @@ import os
 if "-t" in sys.argv or "--test" in sys.argv:
     os.environ["TEST_MODE"] = "true"
 
-from logger import setup_multiprocess_logging
-setup_multiprocess_logging()
+
 import logging
+from logger import setup_multiprocess_logging
+
+log_level = logging.INFO
+if "-ll" in sys.argv:
+    idx = sys.argv.index("-ll") + 1
+    if idx >= len(sys.argv): raise ValueError("Expected log level value after -ll, one of ([d]ebug, [i]nfo, [w]arning, [e]rror).")
+
+    match sys.argv[idx]:
+        case "debug" | "d": log_level = logging.DEBUG
+        case "info" | "i": log_level = logging.INFO
+        case "warning" | "w": log_level = logging.WARNING
+        case "error" | "e": log_level = logging.ERROR
+        case _: raise ValueError(f"Expected one of ([d]ebug, [i]nfo, [w]arning, [e]rror) for log level, not {sys.argv[idx]}")
+setup_multiprocess_logging(console_level=log_level)
+
 LOGGER = logging.getLogger(__name__)
 import traceback
 
@@ -41,6 +55,8 @@ async def main():
     if "--push-hist" in sys.argv:
         LOGGER.info("Pushing history to DB.")
         await queue_sp_history()
+
+    scheduler = None
     try:
         LOGGER.info("Starting embedding worker processes...")
 
@@ -59,7 +75,8 @@ async def main():
     except Exception as e:
         LOGGER.error(f"Main loop error: {traceback.format_exc()}")
     finally:
-        scheduler.shutdown()
+        if scheduler:
+            scheduler.shutdown()
         
         end_processes()
 

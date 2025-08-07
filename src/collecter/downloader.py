@@ -23,22 +23,27 @@ from collecter.metadata import (
 )
 
 DOWNLOAD_LOC = None
+LookupError = None
 Spotdl = None
 
 
 def spotdl_lazy_load():
-    global Spotdl
+    global Spotdl, LookupError
 
     if Spotdl is not None:
         return
 
     if os.getenv("TEST_MODE"):
-        from tests.mocks.embedders import Spotdl_fake as _Spotdl
         LOGGER.debug("Initializing mock Spotdl client.")
+        from tests.mocks.embedders import Spotdl_fake as _Spotdl, LookupError as _LookupError
+
     else:
-        from spotdl import Spotdl as _Spotdl
         LOGGER.debug("Initializing Spotdl client.")
+        from spotdl import Spotdl as _Spotdl
+        from spotdl.download.downloader import LookupError as _LookupError
+
     Spotdl = _Spotdl
+    LookupError = _LookupError
 
 CURRENTLY_DOWNLOADING = set()
 async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downloader):
@@ -75,10 +80,12 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
 
         LOGGER.info(f"Song found for '{spotify_id}: {song.name} by {song.artist}")
         
-        _, file_path = spotdl.download(song)
-
-        if not file_path or not os.path.exists(file_path):
+        try:
+            _, file_path = spotdl.download(song)
+            assert file_path and os.path.exists(file_path)
+        except (AssertionError, LookupError):
             LOGGER.info(f"{spotify_id} recognized by Spotdl but audio not found on providers.")
+
             async with get_session() as s:
                 # Remove from queue
                 result = await s.execute(delete(song_queue.q_type)
@@ -176,7 +183,7 @@ def clean_downloads(song_queues: list):
         for sp_id in set(list(CURRENTLY_DOWNLOADING) + q_spotify_ids):  # Still in the process.
             LOGGER.debug(f"Checking if {sp_id} in {file}")
             if sp_id in file:
-                continue
+                break
         else:
             LOGGER.debug(f"Deleting song '{file}'.")
             os.remove(os.path.join(DOWNLOAD_LOC, file))

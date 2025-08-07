@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-from pylast import Artist, Track
+from pylast import Artist, Track, WSError
 from spotipy.oauth2 import SpotifyOAuth
 
 if os.getenv("TEST_MODE"):
@@ -93,7 +93,7 @@ def _sp_to_lastfm(artist_id: str) -> Artist | None:
         Universal IDs like ISRC or EAN don't have enough coverage.
             - maybe ID with fallback system?
     """
-    if artist_id is None: return None
+    if artist_id is None: return
     # time.sleep(0.25)  # Prevent rate-limit.
 
     try:
@@ -126,8 +126,8 @@ def _sp_to_mb(artist_id: str) -> str | None:
     res = mb.search_recordings(f'artist:"{artist_name}" AND recording:"{top_song}"')
 
     if len(res["recording-list"]) == 0:
-        LOGGER.warning(f"No artists found in response for '{artist_name} - {top_song}': {res}")
-        return None
+        LOGGER.info(f"No MusicBrainz artists found in response for '{artist_name} - {top_song}': {res}")
+        return 
 
     for mb_artist in res["recording-list"][0]["artist-credit"]:
         if not isinstance(mb_artist, dict) or "artist" not in mb_artist:
@@ -455,14 +455,17 @@ async def create_push_artist(spotify_id: str, session=None) -> Artist | None:
             metadata = []
             if lfm_artist := _sp_to_lastfm(spotify_id):
                 LOGGER.debug(f"Adding LastFM tags to artist '{artist_name}'.")
-                metadata.extend([
-                    ArtistMetadata(
-                        artist_id=artist.artist_id,
-                        type=MetadataType.genre, 
-                        value=tag.item.get_name().strip().capitalize(), 
-                        source="LastFM"
-                    ) for tag in lfm_artist.get_top_tags()
-                ])
+                try:
+                    metadata.extend([
+                        ArtistMetadata(
+                            artist_id=artist.artist_id,
+                            type=MetadataType.genre, 
+                            value=tag.item.get_name().strip().capitalize(), 
+                            source="LastFM"
+                        ) for tag in lfm_artist.get_top_tags()
+                    ])
+                except WSError:
+                    LOGGER.warning(f"Received invalid LastFM artist for '{artist_name}': {lfm_artist}")
 
             if mb_tags := _get_mb_artist_tags(_sp_to_mb(spotify_id)):
                 LOGGER.debug(f"Adding MusicBrainz tags to artist '{artist_name}'.")

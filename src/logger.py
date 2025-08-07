@@ -4,7 +4,36 @@ import multiprocessing
 import os
 from pathlib import Path
 
-def setup_multiprocess_logging(log_path: str = None):
+NOISY_LOGGERS = ["sqlalchemy.engine",
+                 "sqlalchemy.dialects", 
+                 "sqlalchemy.pool", 
+                 "sqlalchemy.orm", 
+                 "httpcore", 
+                 "httpx", 
+                 "apscheduler", 
+                 "h5py", 
+                 "pylast", 
+                 "spotipy", 
+                 "musicbrainz", 
+                 "spotdl", 
+                 "huggingface", 
+                 "urllib3.connectionpool"]
+
+class NumbaFilter(logging.Filter):
+    def filter(self, record):
+        return "numba.core" not in record.name
+
+class InfoAndAboveNoisyFilter(logging.Filter):
+    def filter(self, record):
+        if not any(logger in record.name for logger in NOISY_LOGGERS): return True
+        return record.levelno >= logging.INFO
+
+class WarningAndAboveNoisyFilter(logging.Filter):
+    def filter(self, record):
+        if not any(logger in record.name for logger in NOISY_LOGGERS): return True
+        return record.levelno >= logging.WARNING
+
+def setup_multiprocess_logging(log_path: str = None, console_level=logging.INFO):
     """
     One function to set up logging for multiprocessing.
     Call this ONCE in your main process.
@@ -14,6 +43,8 @@ def setup_multiprocess_logging(log_path: str = None):
         log_path = f"{log_folder}/log.log"
     
     Path(log_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "w") as f:
+        pass
     
     # Create the multiprocessing-safe file handler
     file_handler = logging.handlers.RotatingFileHandler(
@@ -22,7 +53,7 @@ def setup_multiprocess_logging(log_path: str = None):
     
     # Create console handler
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO) 
+    console_handler.setLevel(console_level) 
     
     # Set formatter
     formatter = logging.Formatter(
@@ -31,7 +62,12 @@ def setup_multiprocess_logging(log_path: str = None):
     )
     
     file_handler.setFormatter(formatter)
+    file_handler.addFilter(NumbaFilter())
+    file_handler.addFilter(InfoAndAboveNoisyFilter())
+
     console_handler.setFormatter(formatter)
+    console_handler.addFilter(NumbaFilter())
+    console_handler.addFilter(WarningAndAboveNoisyFilter())
     
     # Configure root logger
     root_logger = logging.getLogger()
@@ -40,22 +76,13 @@ def setup_multiprocess_logging(log_path: str = None):
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
     
-    for logger_name in ["sqlalchemy.engine", "sqlalchemy.dialects", "sqlalchemy.pool", 
-                        "sqlalchemy.orm", "httpcore", "h5py", "urllib3.connectionpool", 
-                        "numba.core.ssa"]:  # TODO: Make this actually work.
-        l = logging.getLogger(logger_name)
-        l.setLevel(logging.DEBUG)
-        
-        l.handlers.clear()
-        l.propagate = False
-        
-        if logger_name != "numba.core.ssa":
-            l.addHandler(file_handler)
-        
-        console_warning = logging.StreamHandler()
-        console_warning.setLevel(logging.WARNING) 
-        console_warning.setFormatter(formatter)
-        l.addHandler(console_warning)
-    
-    
-    logging.info(f"Logging initialized (PID: {os.getpid()})")
+    level_to_str = {logging.DEBUG: "debug",
+                    logging.INFO: "info",
+                    logging.WARNING: "warning",
+                    logging.ERROR: "error",
+                    }
+
+    logging.info(f"Logging initialized (PID: {os.getpid()}) " \
+                 f"(console level: {level_to_str[console_level]})")
+    print(f"Logging initialized (PID: {os.getpid()}) " \
+          f"(console level: {level_to_str[console_level]})")

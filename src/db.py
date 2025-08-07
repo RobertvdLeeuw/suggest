@@ -131,7 +131,7 @@ class DatabaseManager:
             await session.commit()
         except Exception as e:
             await session.rollback()
-            LOGGER.error(f"Session error, rolling back: {str(e)}")
+            LOGGER.error(f"Session error, rolling back: {traceback.format_exc()}")
             raise
         finally:
             await session.close()
