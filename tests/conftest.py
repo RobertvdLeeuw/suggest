@@ -8,6 +8,7 @@ from typing import AsyncGenerator
 from sqlalchemy import text, URL
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+
 # Add src to path so imports work
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
@@ -112,6 +113,8 @@ async def get_isolated_test_db():
         
     finally:
         # Cleanup: close all connections and drop the database
+        from collecter.embedders import end_processes
+        end_processes()
         await db_manager.cleanup()
         
         # Restore environment variable

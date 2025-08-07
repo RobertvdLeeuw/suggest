@@ -86,6 +86,8 @@ class SongQueue:  # Queue with peek and membership testing.
         self.name = name
         self.q_type = q_type
 
+        self._process: mp.Process
+
         self.queue = mp.Manager().list()
         self.lock = mp.Lock()
         self.condition = mp.Condition(self.lock)
@@ -258,16 +260,20 @@ def start_processes(selection: list[QueueObject] = []) -> list[SongQueue]:
         )
         PROCESSES.append(process)
         process.start()
+        q._process = process
 
     return queues
 
 def end_processes():
     for p in PROCESSES:
-        if p.is_alive():
-            p.terminate()
-            p.join(timeout=5) 
-
-            if p.is_alive():
-                LOGGER.warning(f"Process {p.name} did not terminate gracefully, forcing kill")
-                p.kill()
+        end_process(p)
     PROCESSES.clear()
+
+def end_process(p):
+    if p.is_alive():
+        p.terminate()
+        p.join(timeout=5) 
+
+        if p.is_alive():
+            LOGGER.warning(f"Process {p.name} did not terminate gracefully, forcing kill")
+            p.kill()

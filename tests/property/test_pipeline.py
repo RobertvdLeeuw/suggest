@@ -4,7 +4,7 @@ import time
 
 import os
 os.environ["TEST_MODE"] = "true"
-os.environ["POSTGRES_DB"] = "test_db"
+# os.environ["POSTGRES_DB"] = "test_db"
 
 from logger import setup_multiprocess_logging
 setup_multiprocess_logging()
@@ -54,6 +54,9 @@ async def test_queue_processes_all_and_cleans(q_data):
 
             await asyncio.sleep(3)
             assert len(os.listdir("./mock_downloads")) == 0
+
+            from collecter.embedders import end_process
+            end_process(q)
 
 # @given(queue_strat(fill_via_db=False))
 # @settings(max_examples=5)
