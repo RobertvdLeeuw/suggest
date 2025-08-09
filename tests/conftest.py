@@ -76,64 +76,67 @@ async def get_isolated_test_db():
     
     admin_engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
     
-    try:
-        # Create the test database
-        async with admin_engine.connect() as conn:
-            # Terminate any existing connections to the database
-            await conn.execute(text(f"""
-                SELECT pg_terminate_backend(pid)
-                FROM pg_stat_activity
-                WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
-            """))
-            
-            # Drop database if it exists (cleanup from failed previous run)
-            await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
-            
-            # Create new database
-            await conn.execute(text(f"CREATE DATABASE {db_name}"))
+# try:
+    # Create the test database
+    async with admin_engine.connect() as conn:
+        # Terminate any existing connections to the database
+        await conn.execute(text(f"""
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
+        """))
         
-        # Import db_manager AFTER setting the environment variable
-        from db import db_manager, DatabaseManager
+        # Drop database if it exists (cleanup from failed previous run)
+        import logging
+        logging.debug(f"Dropping database '{db_name}'.")
+        await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
         
-        # Reset the global instance to pick up the new database name
-        await db_manager.cleanup()
-        DatabaseManager._instance = None
-        DatabaseManager._initialized = False
+        # Create new database
+        logging.debug(f"Creating database '{db_name}'.")
+        await conn.execute(text(f"CREATE DATABASE {db_name}"))
+    
+    # Import db_manager AFTER setting the environment variable
+    from db import db_manager, DatabaseManager
+    
+    # Reset the global instance to pick up the new database name
+    await db_manager.cleanup()
+    DatabaseManager._instance = None
+    DatabaseManager._initialized = False
+    
+    # Initialize with the test database
+    await db_manager.initialize()
+    
+    # Set up the database schema
+    engine = await db_manager.get_engine()
+    async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        await conn.run_sync(Base.metadata.create_all)
+    
+    yield db_manager
+    
+# finally:
+    # Cleanup: close all connections and drop the database
+    from collecter.embedders import end_processes
+    end_processes()
+    await db_manager.cleanup()
+    
+    # Restore environment variable
+    if old_test_db is not None:
+        os.environ["TEST_DATABASE_NAME"] = old_test_db
+    else:
+        os.environ.pop("TEST_DATABASE_NAME", None)
+    
+    # Drop the test database
+    async with admin_engine.connect() as conn:
+        # Terminate any remaining connections
+        await conn.execute(text(f"""
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
+        """))
         
-        # Initialize with the test database
-        await db_manager.initialize()
-        
-        # Set up the database schema
-        engine = await db_manager.get_engine()
-        async with engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-            await conn.run_sync(Base.metadata.create_all)
-        
-        yield db_manager
-        
-    finally:
-        # Cleanup: close all connections and drop the database
-        from collecter.embedders import end_processes
-        end_processes()
-        await db_manager.cleanup()
-        
-        # Restore environment variable
-        if old_test_db is not None:
-            os.environ["TEST_DATABASE_NAME"] = old_test_db
-        else:
-            os.environ.pop("TEST_DATABASE_NAME", None)
-        
-        # Drop the test database
-        async with admin_engine.connect() as conn:
-            # Terminate any remaining connections
-            await conn.execute(text(f"""
-                SELECT pg_terminate_backend(pid)
-                FROM pg_stat_activity
-                WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
-            """))
-            
-            # Drop the database
-            await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
-        
-        await admin_engine.dispose()
+        # Drop the database
+        await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
+    
+    await admin_engine.dispose()
 

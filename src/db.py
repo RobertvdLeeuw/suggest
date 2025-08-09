@@ -59,9 +59,10 @@ class DatabaseManager:
             return
             
         try:
+            url = self.create_database_url()
             # Enhanced engine configuration
             self._engine = create_async_engine(
-                self.create_database_url(),
+                url,
                 # Connection pool settings
                 poolclass= AsyncAdaptedQueuePool,
                 pool_size=10,                    # Number of connections to maintain
@@ -97,7 +98,7 @@ class DatabaseManager:
             # Test the connection
             async with self._engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
-                LOGGER.info("Database connection test successful")
+                LOGGER.info(f"Database connection test to '{url.database}' successful")
             
             # Create session factory
             self._session_factory = async_sessionmaker(

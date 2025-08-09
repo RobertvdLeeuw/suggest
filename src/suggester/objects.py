@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from operator import itemgetter
 from functools import reduce
 from copy import deepcopy
 
-from logger import get_logger
 import traceback
 import logging
 LOGGER = logging.getLogger(__name__)
@@ -25,36 +25,49 @@ class TrainEvent(Enum):  # Used to define when to calc what metric.
     STEP_END = "step end"
     REWARD_OBSERVED = "reward observed"
 
-class MetricType(Enum):  # So we can group different metrics into same plot (e.g. expected values for different models).
-    PREDICTED_VALUE = "predicted value"
-    MODEL_PARAM_CHANGE = "model param change"
+# class MetricType(Enum):  # So we can group different metrics into same plot (e.g. expected values for different models).
+#     PREDICTED_VALUE = "predicted value"
+#     MODEL_PARAM_CHANGE = "model param change"
 
 class Metric(ABC):
     name: str
     id: str
 
-    type: MetricType
-    children: list["Metric"]
+    # type: MetricType
+    children: list["Metric"] = None
 
     # TODO: Something np/polar object (f16)
-    values: list[dict[str, float | int] | list[float | int]] = []
+    values: list[dict[str, float | int] | list[float | int]] = None
     on_event: TrainEvent
 
-    def __init__(self, **kwargs):
-        for c in self.children:
-            assert c.on_event != self.on_event, f"{self.name} triggers on event '{self.on_event}' but child '{c.name}' expects event '{c.on_event}'."
-            assert c.type != self.type, f"{self.name} is of type '{self.type}' but child '{c.type}' is of type '{c.type}'."
+    arguments: list[str]
 
-    def calc(self, event: TrainEvent, *args, **kwargs):
+    def __init__(self):
+        if self.children:
+            for c in self.children:
+                assert c.on_event == self.on_event, f"{self.name} triggers on event '{self.on_event}' but child '{c.name}' expects event '{c.on_event}'."
+                # assert c.type == self.type, f"{self.name} is of type '{self.type}' but child '{c.type}' is of type '{c.type}'."
+            self.children = [c() for c in self.children]
+        else: 
+            self.children = []
+
+        self.values = []
+
+    def calc(self, event: TrainEvent, **kwargs):
         if event != self.on_event:
             return
 
-        if self.children:
-            [c.calc(event, *args, **kwargs) for c in self.children]
+        for arg in self.arguments:
+            assert arg in kwargs, f"About to calc {name}, but {arg} is missing from kwargs: " \
+                                  f"'{"' ".join(kwargs)}'."
 
-        # TODO: Should only children calc, and higher level values calced on the fly for plots? 
-            # Less data in DB this way.
-        self.calc_inner(*args, **kwargs)
+        kwargs = {k: v for  k, v in kwargs.items() if k in self.arguments}
+
+        if self.children:
+            for c in self.children:
+                c.calc(event, **kwargs)
+        else:
+            self.calc_inner(**kwargs)
     
     @abstractmethod
     def calc_inner():
@@ -63,14 +76,15 @@ class Metric(ABC):
     def __str__(self): return repr(self)
 
     def __repr__(self) -> str:
-        if self.start_format == []:
+        if isinstance(self.values, list):
             body = pd.Series(self.values).describe()
+            # TODO: Update other cases below.
         elif isinstance(self.start_format, dict) and all(isinstance(component, list) for component in self.start_format.values()):
             body = {k: pd.Series(v).describe() for k, v in self.values.items()}
         else: 
             raise NotImplementedError(f"Repr pattern not implement for object of structure: {self.start_format}")
 
-        return f"{self.name} on {self.on_event} initialized as {self.start_format}:\n\t{body}"
+        return f"{self.name} on {self.on_event}:\n\t{body}"
 
 @dataclass
 class Trajectory: 
@@ -104,18 +118,21 @@ class Model(ABC):
         assert n_in > n_out or n_in == 0, "Model should filter (in > out)."
 
         for m in metrics:
-            assert all(m in self.allowed_metrics), f"Unallowed metric for {self.name}: {m.name}."
+            assert all(m in self.allowed_metrics for m in metrics), f"Unallowed metric for {self.name}: {m.name}."
 
         self.n_in = n_in
         self.n_out = n_out
-        self.metrics = metrics
+        self.metrics = [m() for m in metrics]
 
     def __str__(self): return repr(self)
 
     def __repr__(self) -> str:
-        m = ", ".join([m.name for m in self.matrics])
+        m = ", \n".join([m.name for m in self.metrics])
         return f"{self.name} ({self.n_in} -> {self.n_out}), metrics: {m}"
         
+    def calc_metrics(self, event: TrainEvent, **kwargs):
+        [m.calc(event, **kwargs) for m in self.metrics]
+
     def process(self, items: np.ndarray) -> np.ndarray:
         for col in ["song_id", "chunk_id", "embedding"]:
             assert col in items.dtype.names, f"{col} missing in embeddings in."

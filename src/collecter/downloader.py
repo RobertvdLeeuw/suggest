@@ -21,9 +21,10 @@ from collecter.metadata import (
     _add_to_db_queue,
     get_spotipy
 )
+from spotdl.providers.audio.base import AudioProviderError
+from spotdl.download.downloader import DownloaderError
 
 DOWNLOAD_LOC = None
-LookupError = None
 Spotdl = None
 
 
@@ -35,19 +36,15 @@ def spotdl_lazy_load():
 
     if os.getenv("TEST_MODE"):
         LOGGER.debug("Initializing mock Spotdl client.")
-        from tests.mocks.embedders import Spotdl_fake as _Spotdl, LookupError as _LookupError
-
+        from tests.mocks.embedders import Spotdl_fake as _Spotdl
     else:
         LOGGER.debug("Initializing Spotdl client.")
         from spotdl import Spotdl as _Spotdl
-        from spotdl.download.downloader import LookupError as _LookupError
 
     Spotdl = _Spotdl
-    LookupError = _LookupError
 
 CURRENTLY_DOWNLOADING = set()
 async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downloader):
-
     if spotify_id in CURRENTLY_DOWNLOADING:
         return
 
@@ -69,7 +66,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
             downloader_settings=DownloaderOptions(format="wav", 
                                                   simple_tui=False,
                                                   print_download_errors=False,
-                                                  output=DOWNLOAD_LOC),
+                                                  output="./downloading"),
             loop=asyncio.get_event_loop()
         )
         song = spotdl.search(["https://open.spotify.com/track/" + spotify_id])[0]
@@ -83,7 +80,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         try:
             _, file_path = spotdl.download(song)
             assert file_path and os.path.exists(file_path)
-        except (AssertionError, LookupError):
+        except (AssertionError, LookupError, DownloaderError):
             LOGGER.info(f"{spotify_id} recognized by Spotdl but audio not found on providers.")
 
             async with get_session() as s:
@@ -96,7 +93,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
             return
 
         old_path = Path(file_path)
-        with_id = old_path.parent / f"{spotify_id} {old_path.name}"
+        with_id = old_path.parent.parent / f"{DOWNLOAD_LOC}/{spotify_id} {old_path.name}"
 
         LOGGER.debug(f"Renaming '{old_path}' to '{with_id}'.")
         old_path.rename(with_id)
@@ -112,6 +109,9 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         LOGGER.info(f"Downloading song '{file_path}' successful.")
     except KeyboardInterrupt:
         raise KeyboardInterrupt
+    except AudioProviderError:
+        LOGGER.warning(f"Downloading song '{spotify_id}' failed: Audio provided failed.")
+        CURRENTLY_DOWNLOADING.remove(spotify_id)
     except Exception as e:
         LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
         CURRENTLY_DOWNLOADING.remove(spotify_id)

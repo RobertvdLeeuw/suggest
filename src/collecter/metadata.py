@@ -354,7 +354,7 @@ async def _add_to_db_queue(spotify_track_ids: list[str]):
         
         if new_tracks:
             LOGGER.debug(f"About to add {len(new_tracks)} queue items")
-            s.add_all(new_tracks)
+            s.add_all(new_tracks)  # TODO: Ignore conflicts.
             # Session will be committed by context manager
         
     LOGGER.info(f"Added {len(new_tracks)} queue items.")

@@ -64,7 +64,7 @@ def _auditus_load():
             AudioEmbedding = _auditus().AudioEmbedding
             AudioLoader = _auditus().AudioLoader()
         else:
-            LOGGER.debug("Loading Auditus module...")
+            LOGGER.debug("Loading (actual) Auditus module...")
             from auditus.transform import AudioEmbedding as _AudioEmbedding, AudioLoader as _AudioLoader
             AudioEmbedding = _AudioEmbedding
             AudioLoader = _AudioLoader
@@ -155,7 +155,9 @@ def _jukemir_embed(file_path: str, song_id: str) -> list[EmbeddingJukeMIR]:
     LOGGER.info(f"JukeMIR embedding of '{file_path}' successful.")
     return embeddings
 
+_AUDITUS_MODEL = None
 def _auditus_embed(file_path: str, song_id: str) -> list[EmbeddingAuditus]:
+    global _AUDITUS_MODEL
     _auditus_load()
 
     LOGGER.debug(f"Starting Auditus embedding for file: {file_path}")
@@ -181,7 +183,11 @@ def _auditus_embed(file_path: str, song_id: str) -> list[EmbeddingAuditus]:
         audio_chunk = AudioArray(a=audio.a[offset_sr:offset_sr + SEGMENT_LENGTH*SAMPLE_RATE],
                                  sr=SAMPLE_RATE)
 
-        emb = AudioEmbedding(return_tensors="pt")(audio_chunk)
+        if _AUDITUS_MODEL is None:
+            # This loads the entire model every time, so we need to save it (whereas JukeMIR is a singleton).
+            _AUDITUS_MODEL = AudioEmbedding(return_tensors="pt") 
+
+        emb = _AUDITUS_MODEL(audio_chunk)
 
         emb = Pooling(pooling="mean")(emb)
         embeddings.append(EmbeddingAuditus(chunk_id=i, embedding=emb.numpy(), song_id=song_id))

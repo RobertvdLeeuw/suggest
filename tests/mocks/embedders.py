@@ -35,10 +35,6 @@ from spotdl.types.song import Song
 import soundfile as sf
 
 
-class LookupError(Exception):
-    pass
-
-
 class Spotdl_fake:
     def __init__(self, no_cache: bool, spotify_client=None, downloader_settings=None, loop=None):
         pass

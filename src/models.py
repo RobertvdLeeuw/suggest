@@ -439,6 +439,16 @@ class QueueJukeMIR(Base):
     __table_args__ = (
         Index('idx_queue_jukemir_created_at', 'created_at'),
         UniqueConstraint('spotify_id' , name='uq_spotify_id_jukemir'),
+        
+        # Constraint to prevent queueing songs that already have JukeMIR embeddings
+        CheckConstraint(
+            '''NOT EXISTS (
+                SELECT 1 FROM songs s 
+                JOIN embeddings_jukemir ej ON s.song_id = ej.song_id 
+                WHERE s.spotify_id = spotify_id
+            )''',
+            name='chk_queue_jukemir_not_embedded'
+        ),
     )
 
 class QueueAuditus(Base):
@@ -450,6 +460,16 @@ class QueueAuditus(Base):
     __table_args__ = (
         Index('idx_queue_auditus_created_at', 'created_at'),
         UniqueConstraint('spotify_id', name='uq_spotify_id_auditus'),
+        
+        # Constraint to prevent queueing songs that already have Auditus embeddings
+        CheckConstraint(
+            '''NOT EXISTS (
+                SELECT 1 FROM songs s 
+                JOIN embeddings_auditus ea ON s.song_id = ea.song_id 
+                WHERE s.spotify_id = spotify_id
+            )''',
+            name='chk_queue_auditus_not_embedded'
+        )
     )
     
 class EmbeddingJukeMIR(Base):

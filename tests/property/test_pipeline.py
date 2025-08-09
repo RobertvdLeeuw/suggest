@@ -100,3 +100,6 @@ async def test_queue_processes_all_and_cleans(q_data):
 # async def test_max_downloads():
 #     """Downloaded files never exceed far above max in queues (considering system restarts (should queue picking from db be sorted more deterministically?))"""
 #     pass
+
+
+# Failed downloads never make their way into the ambedding tables.
