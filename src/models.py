@@ -219,20 +219,22 @@ class Suggested(Base):
 
     song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
     user_id = Column(Integer, ForeignKey('users.user_id'), primary_key=True)
-    score = Column(Float, nullable=False)  # f32 in schema
-    predicted = Column(Float, nullable=False)  # f32 in schema
-    suggested_by = Column(Integer, nullable=False)
+
+    # score = Column(Float, nullable=False)  # f32 in schema
+    # predicted = Column(Float, nullable=False)  # f32 in schema
+    suggested_by = Column(Integer, ForeignKey('funnels.funnel_id'), nullable=False)
 
     song = relationship("Song", back_populates="suggested_songs")
     user = relationship("User", back_populates="suggested_songs")
+    funnel = relationship("Funnel", back_populates="suggested_songs")
 
     __table_args__ = (
         Index('idx_suggested_user_id', 'user_id'),
         Index('idx_suggested_song_id', 'song_id'),
-        Index('idx_suggested_score', 'score'),
-        Index('idx_suggested_predicted', 'predicted'),
+        # Index('idx_suggested_score', 'score'),
+        # Index('idx_suggested_predicted', 'predicted'),
         Index('idx_suggested_by', 'suggested_by'),
-        Index('idx_suggested_user_score', 'user_id', 'score'),
+        # Index('idx_suggested_user_score', 'user_id', 'score'),
         # Validation constraints
         # CheckConstraint('score >= 0 AND score <= 1', name='chk_suggested_score_range'),
         # CheckConstraint('predicted >= 0 AND predicted <= 1', name='chk_suggested_predicted_range'),
@@ -241,7 +243,7 @@ class Suggested(Base):
 class Model(Base):
     __tablename__ = 'models'
 
-    model_id = Column(Integer, primary_key=True, autoincrement=True)
+    model_id = Column(String(255), primary_key=True)
     model_name = Column(String(100))
     param_schema = Column(JSON)
 
@@ -258,8 +260,8 @@ class Model(Base):
 class ModelMetric(Base):
     __tablename__ = 'model_metric'
 
-    model_id = Column(Integer, ForeignKey('models.model_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
-    metric_id = Column(Integer, ForeignKey('metrics.metric_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
+    model_id = Column(String(255), ForeignKey('models.model_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
+    metric_id = Column(String(255), ForeignKey('metrics.metric_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
 
     __table_args__ = (
         Index('idx_model_metric_model_id', 'model_id'),
@@ -269,13 +271,13 @@ class ModelMetric(Base):
 class Metric(Base):
     __tablename__ = 'metrics'
 
-    metric_id = Column(Integer, primary_key=True, autoincrement=True)
+    metric_id = Column(String(255), primary_key=True)
     name = Column(String(255), nullable=False)
     type = Column(String(255), nullable=False) 
 
     performances = relationship("ModelPerformance", back_populates="metric")
 
-    parent_id = Column(Integer, ForeignKey('metrics.metric_id'))
+    parent_id = Column(String(255), ForeignKey('metrics.metric_id'))
     
     models = relationship("Model", secondary="model_metric", back_populates="metrics")
 
@@ -292,8 +294,8 @@ class Metric(Base):
 class ModelPerformance(Base):
     __tablename__ = 'performances'
 
-    metric_id = Column(Integer, ForeignKey('metrics.metric_id'), primary_key=True)
-    trajectory_id = Column(Integer, ForeignKey('trajectory.trajectory_id'), primary_key=True)
+    metric_id = Column(String(255), ForeignKey('metrics.metric_id'), primary_key=True)
+    trajectory_id = Column(Integer, ForeignKey('trajectories.trajectory_id'), primary_key=True)
     timestep = Column(Integer, primary_key=True)
     song = Column(String(255))
     value = Column(Float, nullable=False)
@@ -313,7 +315,7 @@ class ModelPerformance(Base):
     )
 
 class Funnel(Base):
-    __tablename__ = 'funnel'
+    __tablename__ = 'funnels'
 
     funnel_id = Column(Integer, primary_key=True, autoincrement=True)
     funnel_name = Column(String(255), nullable=False)
@@ -326,10 +328,10 @@ class Funnel(Base):
     )
 
 class FunnelModel(Base):
-    __tablename__ = 'funnel_model'
+    __tablename__ = 'funnel_models'
 
-    funnel_id = Column(Integer, ForeignKey('funnel.funnel_id'), primary_key=True)
-    model_id = Column(Integer, ForeignKey('models.model_id'), primary_key=True)
+    funnel_id = Column(Integer, ForeignKey('funnels.funnel_id'), primary_key=True)
+    model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
     position = Column(Integer, nullable=False)
 
     funnel = relationship("Funnel", back_populates="models")
@@ -346,11 +348,11 @@ class FunnelModel(Base):
     )
 
 class Trajectory(Base):
-    __tablename__ = 'trajectory'
+    __tablename__ = 'trajectories'
 
     trajectory_id = Column(Integer, primary_key=True, autoincrement=True)
-    model_id = Column(Integer, ForeignKey('models.model_id'))
-    funnel_id = Column(Integer, ForeignKey('funnel.funnel_id'))
+    model_id = Column(String(255), ForeignKey('models.model_id'))
+    # funnel_id = Column(Integer, ForeignKey('funnels.funnel_id'))
 
     started = Column(DateTime, nullable=False)
     ended = Column(DateTime)
@@ -363,7 +365,7 @@ class Trajectory(Base):
 
     __table_args__ = (
         Index('idx_trajectory_model_id', 'model_id'),
-        Index('idx_trajectory_funnel_id', 'funnel_id'),
+        # Index('idx_trajectory_funnel_id', 'funnel_id'),
         Index('idx_trajectory_started', 'started'),
         Index('idx_trajectory_ended', 'ended'),
         Index('idx_trajectory_on_history', 'on_history'),
@@ -376,10 +378,9 @@ class Trajectory(Base):
 class ParamInstance(Base):
     __tablename__ = 'param_instances'
 
-    model_id = Column(Integer, ForeignKey('models.model_id'), primary_key=True)
-    trajectory_id = Column(Integer, ForeignKey('trajectory.trajectory_id'), primary_key=True)
+    model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
+    trajectory_id = Column(Integer, ForeignKey('trajectories.trajectory_id'), primary_key=True)
     params = Column(JSON, nullable=False)  # blob in schema, using JSON for SQLAlchemy
-
     
     model = relationship("Model")
     trajectory = relationship("Trajectory", back_populates="param_instances")
@@ -392,7 +393,7 @@ class ParamInstance(Base):
 class Hyperparameter(Base):
     __tablename__ = 'hyperparameters'
 
-    model_id = Column(Integer, ForeignKey('models.model_id'), primary_key=True)
+    model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
     hp_id = Column(Integer, primary_key=True)
     type = Column(SQLEnum(HyperparameterType), nullable=False)  # enum (f32, bool)
     min = Column(Float)  # f32 in schema
@@ -411,8 +412,8 @@ class Hyperparameter(Base):
 class HPInstance(Base):
     __tablename__ = 'hp_instances'
 
-    model_id = Column(Integer, ForeignKey('models.model_id'), primary_key=True)
-    trajectory_id = Column(Integer, ForeignKey('trajectory.trajectory_id'), primary_key=True)
+    model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
+    trajectory_id = Column(Integer, ForeignKey('trajectories.trajectory_id'), primary_key=True)
     hp_id = Column(Integer, primary_key=True)
     type = Column(SQLEnum(HyperparameterType), nullable=False)  # enum (f32, bool)
     value = Column(Float, nullable=False)  # f32 in schema
@@ -439,16 +440,6 @@ class QueueJukeMIR(Base):
     __table_args__ = (
         Index('idx_queue_jukemir_created_at', 'created_at'),
         UniqueConstraint('spotify_id' , name='uq_spotify_id_jukemir'),
-        
-        # Constraint to prevent queueing songs that already have JukeMIR embeddings
-        CheckConstraint(
-            '''NOT EXISTS (
-                SELECT 1 FROM songs s 
-                JOIN embeddings_jukemir ej ON s.song_id = ej.song_id 
-                WHERE s.spotify_id = spotify_id
-            )''',
-            name='chk_queue_jukemir_not_embedded'
-        ),
     )
 
 class QueueAuditus(Base):
@@ -460,16 +451,6 @@ class QueueAuditus(Base):
     __table_args__ = (
         Index('idx_queue_auditus_created_at', 'created_at'),
         UniqueConstraint('spotify_id', name='uq_spotify_id_auditus'),
-        
-        # Constraint to prevent queueing songs that already have Auditus embeddings
-        CheckConstraint(
-            '''NOT EXISTS (
-                SELECT 1 FROM songs s 
-                JOIN embeddings_auditus ea ON s.song_id = ea.song_id 
-                WHERE s.spotify_id = spotify_id
-            )''',
-            name='chk_queue_auditus_not_embedded'
-        )
     )
     
 class EmbeddingJukeMIR(Base):

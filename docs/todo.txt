@@ -1,0 +1,20 @@
+Usecases/flows:
+  - Get song suggestion
+    - Whatever forms of human feedback
+    - Info about shit like "n suggestions until model update"
+  - See history/suggestions
+  - Plots (probably combined with 1 of the 2 above)
+  - Login
+  - Select model
+  - DB stats (n songs embedded, space left, etc)
+    - API call stats (for rate limit)?
+
+Upload metrics
+  - Upload model for that too
+    - Trajectory
+    - Params
+    - Hyperparams
+Upload suggestions
+  - Constrain suggestions (no prev listened or recommended songs, 
+                           just pick arbitrary date to test with hist)
+API endpoints

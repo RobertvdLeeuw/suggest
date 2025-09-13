@@ -9,7 +9,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import select, delete
-from db import get_session, setup
+from db import get_session
 
 from spotdl.types.options import DownloaderOptions
 
@@ -45,6 +45,9 @@ def spotdl_lazy_load():
 
 CURRENTLY_DOWNLOADING = set()
 async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downloader):
+    global DOWNLOAD_LOC
+    DOWNLOAD_LOC = "./mock_downloads" if os.getenv("TEST_MODE") else "./downloads"
+
     if spotify_id in CURRENTLY_DOWNLOADING:
         return
 
@@ -52,6 +55,8 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         if spotify_id == sp_id:
             LOGGER.debug(f"Song already downloaded: {fpath}.")
             return
+
+    # TODO: If already embedded, skip
 
     LOGGER.info(f"Starting download for: {spotify_id}")
     CURRENTLY_DOWNLOADING.add(spotify_id)
@@ -197,7 +202,6 @@ def clean_downloads(song_queues: list):
 
 
 async def test():
-    await setup()
     # await _download("4sZgFgFZPIwcqDJ4FKJXD2", SongQueue("test", None))
 
     from models import QueueJukeMIR, QueueAuditus

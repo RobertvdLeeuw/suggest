@@ -86,10 +86,9 @@ class LinUCB(Model):
 
 import asyncio
 async def test():
-    from db import setup, get_embeddings
+    from db import get_embeddings
     from models import EmbeddingAuditus
 
-    await setup()
     emb = await get_embeddings(EmbeddingAuditus)
     l = LinUCB(metrics=[SongsPicked, CoefficientChange], 
                n_dim=768, n_in=0, n_out=1, alpha=0.1, 

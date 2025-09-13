@@ -12,7 +12,7 @@ import asyncio
 from sqlalchemy import select, delete, exists
 
 from models import EmbeddingJukeMIR, EmbeddingAuditus, QueueJukeMIR, QueueAuditus, Song
-from db import setup, get_session
+from db import get_session
 from collecter.metadata import create_push_track
 
 from math import floor
@@ -197,8 +197,6 @@ def _auditus_embed(file_path: str, song_id: str) -> list[EmbeddingAuditus]:
 
 async def _async_embed_wrapper(embed_func: callable, name: str, queue: Queue, emb_type):
     LOGGER.info(f"{name} embedding loop started.")
-    await setup()
-
     while True:
         song_file = None
         spotify_id = None

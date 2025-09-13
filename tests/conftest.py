@@ -1,142 +1,114 @@
 import pytest
 import asyncio
-from contextlib import asynccontextmanager
-import sys
 import os
 import uuid
-from typing import AsyncGenerator
-from sqlalchemy import text, URL
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
-
-
-# Add src to path so imports work
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+from pytest_postgresql import factories
+from pytest_postgresql.janitor import DatabaseJanitor
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
+from sqlalchemy import text
 
 from models import Base
 
+# Single PostgreSQL instance for the entire test session
+postgresql_proc = factories.postgresql_proc(port=None)
+
 @pytest.fixture(scope="session")
 def event_loop():
-    """Create an instance of the default event loop for the test session."""
+    """Create event loop for the test session."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
 
-
 @pytest.fixture(scope="function")
-def unique_test_db_name():
-    """Generate a unique database name for this test."""
-    # Include test node info for parallel test support
-    test_id = str(uuid.uuid4())[:8]
-    worker_id = os.environ.get('PYTEST_XDIST_WORKER', 'main')
-    return f"test_db_{worker_id}_{test_id}"
-
-
-@pytest.fixture(scope="function") 
-async def admin_engine():
-    """Create an engine connected to the default postgres database for admin operations."""
-    admin_url = URL.create(
-        drivername='postgresql+asyncpg',
-        username=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ["POSTGRES_HOST"],
-        port=int(os.environ["DB_PORT"]),
-        database='postgres'  # Connect to default postgres db for admin operations
-    )
-    
-    engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
-    yield engine
-    await engine.dispose()
-
-
-@asynccontextmanager
-async def get_isolated_test_db():
-    """Context manager that creates an isolated test database for each use.
-    
-    This is designed for use with Hypothesis property-based tests where each
-    generated test case needs its own fresh database.
-    """
+async def isolated_test_db(postgresql_proc):
+    """Create isolated database per test (much faster than separate instances)."""
     # Generate unique database name
     test_id = str(uuid.uuid4())[:8]
     worker_id = os.environ.get('PYTEST_XDIST_WORKER', 'main')
     db_name = f"test_db_{worker_id}_{test_id}"
     
-    # Set environment variable so production code uses test database
-    old_test_db = os.environ.get("TEST_DATABASE_NAME")
-    os.environ["TEST_DATABASE_NAME"] = db_name
+    # Create the test database
+    janitor = DatabaseJanitor(
+        user=postgresql_proc.user,
+        host=postgresql_proc.host,
+        port=postgresql_proc.port,
+        dbname=db_name,
+        version=postgresql_proc.version,
+    )
+    janitor.init()
     
-    # Create admin engine for database operations
-    admin_url = URL.create(
-        drivername='postgresql+asyncpg',
-        username=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ["POSTGRES_HOST"],
-        port=int(os.environ["DB_PORT"]),
-        database='postgres'
+    connection_str = (
+        f"postgresql+asyncpg://{postgresql_proc.user}:@"
+        f"{postgresql_proc.host}:{postgresql_proc.port}/{db_name}"
     )
     
-    admin_engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
+    # Set environment for your DatabaseManager
+    old_test_mode = os.environ.get("TEST_MODE")
+    old_db_name = os.environ.get("TEST_DATABASE_NAME")
+    old_host = os.environ.get("POSTGRES_HOST")
+    old_port = os.environ.get("POSTGRES_PORT") 
+    old_user = os.environ.get("POSTGRES_USER")
     
-# try:
-    # Create the test database
-    async with admin_engine.connect() as conn:
-        # Terminate any existing connections to the database
-        await conn.execute(text(f"""
-            SELECT pg_terminate_backend(pid)
-            FROM pg_stat_activity
-            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
-        """))
-        
-        # Drop database if it exists (cleanup from failed previous run)
-        import logging
-        logging.debug(f"Dropping database '{db_name}'.")
-        await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
-        
-        # Create new database
-        logging.debug(f"Creating database '{db_name}'.")
-        await conn.execute(text(f"CREATE DATABASE {db_name}"))
+    os.environ["TEST_MODE"] = "true"
+    os.environ["TEST_DATABASE_NAME"] = db_name
+    os.environ["POSTGRES_HOST"] = postgresql_proc.host
+    os.environ["POSTGRES_PORT"] = str(postgresql_proc.port)
+    os.environ["POSTGRES_USER"] = postgresql_proc.user
     
-    # Import db_manager AFTER setting the environment variable
-    from db import db_manager, DatabaseManager
+    # Reset DatabaseManager to pick up new environment
+    from db import DatabaseManager
+    await DatabaseManager.cleanup_all_instances()
     
-    # Reset the global instance to pick up the new database name
-    await db_manager.cleanup()
-    DatabaseManager._instance = None
-    DatabaseManager._initialized = False
+    # Create engine and set up schema
+    engine = create_async_engine(connection_str, poolclass=NullPool, echo=False)
     
-    # Initialize with the test database
-    await db_manager.initialize()
-    
-    # Set up the database schema
-    engine = await db_manager.get_engine()
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         await conn.run_sync(Base.metadata.create_all)
     
-    yield db_manager
+    yield engine, db_name
     
-# finally:
-    # Cleanup: close all connections and drop the database
-    from collecter.embedders import end_processes
-    end_processes()
-    await db_manager.cleanup()
+    # Cleanup
+    await engine.dispose()
+    await DatabaseManager.cleanup_all_instances()
+    janitor.drop()
     
-    # Restore environment variable
-    if old_test_db is not None:
-        os.environ["TEST_DATABASE_NAME"] = old_test_db
+    # Restore environment
+    if old_test_mode is not None:
+        os.environ["TEST_MODE"] = old_test_mode
+    else:
+        os.environ.pop("TEST_MODE", None)
+        
+    if old_db_name is not None:
+        os.environ["TEST_DATABASE_NAME"] = old_db_name
     else:
         os.environ.pop("TEST_DATABASE_NAME", None)
-    
-    # Drop the test database
-    async with admin_engine.connect() as conn:
-        # Terminate any remaining connections
-        await conn.execute(text(f"""
-            SELECT pg_terminate_backend(pid)
-            FROM pg_stat_activity
-            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
-        """))
         
-        # Drop the database
-        await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
-    
-    await admin_engine.dispose()
+    # Restore other env vars...
+    for key, old_val in [("POSTGRES_HOST", old_host), 
+                         ("POSTGRES_PORT", old_port),
+                         ("POSTGRES_USER", old_user)]:
+        if old_val is not None:
+            os.environ[key] = old_val
 
+@pytest.fixture(scope="function")  
+async def db_session(isolated_test_db):
+    """Create async session for tests."""
+    engine, db_name = isolated_test_db
+    
+    async_session = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
+    
+    async with async_session() as session:
+        yield session
+
+# Convenience fixture that just sets up the test database
+@pytest.fixture
+async def test_db(isolated_test_db):
+    """Simple test database fixture."""
+    engine, db_name = isolated_test_db
+    yield db_name

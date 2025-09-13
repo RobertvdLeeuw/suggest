@@ -1,7 +1,8 @@
 import os
+import sys
 import asyncio
 import contextlib
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, Dict
 
 from sqlalchemy import URL, text, event, select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -20,18 +21,20 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class DatabaseManager:
-    """Singleton database manager with proper connection handling"""
+    """Process-local singleton database manager with proper connection handling"""
     
-    _instance: Optional['DatabaseManager'] = None
-    _engine: Optional[AsyncEngine] = None
-    _session_factory: Optional[async_sessionmaker] = None
-    _initialized: bool = False
+    _instances: Dict[int, 'DatabaseManager'] = {}  # keyed by process ID
     
     def __new__(cls) -> 'DatabaseManager':
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-    
+        pid = os.getpid()
+        if pid not in cls._instances:
+            instance = super().__new__(cls)
+            # Initialize instance attributes
+            instance._engine: Optional[AsyncEngine] = None
+            instance._session_factory: Optional[async_sessionmaker] = None
+            instance._initialized: bool = False
+            cls._instances[pid] = instance
+        return cls._instances[pid]
     
     def create_database_url(self) -> URL:
         if test_db := os.environ.get("TEST_DATABASE_NAME"):
@@ -41,7 +44,7 @@ class DatabaseManager:
         else:
             database_name = os.environ.get("POSTGRES_DB", "db")
 
-        LOGGER.info(f"Using database '{database_name}'.")
+        LOGGER.info(f"Using database '{database_name}' (PID: {os.getpid()}).")
 
         return URL.create(
             drivername='postgresql+asyncpg',
@@ -55,16 +58,17 @@ class DatabaseManager:
     async def initialize(self) -> None:
         """Initialize database engine and session factory with proper configuration"""
         if self._initialized:
-            LOGGER.debug("Database already initialized")
+            LOGGER.debug(f"Database already initialized for PID {os.getpid()}")
             return
             
+        LOGGER.info(f"Initializing DB engine for PID {os.getpid()}")
         try:
             url = self.create_database_url()
             # Enhanced engine configuration
             self._engine = create_async_engine(
                 url,
                 # Connection pool settings
-                poolclass= AsyncAdaptedQueuePool,
+                poolclass=AsyncAdaptedQueuePool,
                 pool_size=10,                    # Number of connections to maintain
                 max_overflow=20,                 # Additional connections allowed
                 pool_pre_ping=True,              # Validate connections before use
@@ -78,7 +82,7 @@ class DatabaseManager:
                 # Connection arguments for asyncpg
                 connect_args={
                     "server_settings": {
-                        "application_name": "audio_processing_service",
+                        "application_name": f"audio_processing_service_pid_{os.getpid()}",
                         "jit": "off"  # Disable JIT for better performance on small queries
                     },
                     "command_timeout": 60,
@@ -89,16 +93,16 @@ class DatabaseManager:
             # Add connection pool event listeners for monitoring
             @event.listens_for(self._engine.sync_engine, "connect")
             def receive_connect(dbapi_connection, connection_record):
-                LOGGER.debug("New database connection established")
+                LOGGER.debug(f"New database connection established (PID: {os.getpid()})")
             
             @event.listens_for(self._engine.sync_engine, "checkout")
             def receive_checkout(dbapi_connection, connection_record, connection_proxy):
-                LOGGER.debug("Connection checked out from pool")
+                LOGGER.debug(f"Connection checked out from pool (PID: {os.getpid()})")
             
             # Test the connection
             async with self._engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
-                LOGGER.info(f"Database connection test to '{url.database}' successful")
+                LOGGER.info(f"Database connection test to '{url.database}' successful (PID: {os.getpid()})")
             
             # Create session factory
             self._session_factory = async_sessionmaker(
@@ -110,19 +114,18 @@ class DatabaseManager:
             )
             
             self._initialized = True
-            LOGGER.info("Database engine and session factory initialized successfully")
+            LOGGER.info(f"Database engine and session factory initialized successfully (PID: {os.getpid()})")
             
         except Exception as e:
-            LOGGER.error(f"Could not initialize database: {traceback.format_exc()}")
+            LOGGER.error(f"Could not initialize database (PID: {os.getpid()}): {traceback.format_exc()}")
             await self.cleanup()
             raise Exception(f"Database initialization failed: {str(e)}")
-
 
     @contextlib.asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Context manager for database sessions with proper cleanup"""
         if not self._initialized:
-            LOGGER.info("DB not initialized yet, doing that now.")
+            LOGGER.info(f"DB not initialized yet for PID {os.getpid()}, doing that now.")
             await self.initialize()
         
         session = self._session_factory()
@@ -131,7 +134,7 @@ class DatabaseManager:
             await session.commit()
         except Exception as e:
             await session.rollback()
-            LOGGER.error(f"Session error, rolling back: {traceback.format_exc()}")
+            LOGGER.error(f"Session error, rolling back (PID: {os.getpid()}): {traceback.format_exc()}")
             raise
         finally:
             await session.close()
@@ -139,60 +142,77 @@ class DatabaseManager:
     async def get_engine(self) -> AsyncEngine:
         """Get the database engine"""
         if not self._initialized:
-            LOGGER.info("DB not initialized yet, doing that now.")
+            LOGGER.info(f"DB not initialized yet for PID {os.getpid()}, doing that now.")
             await self.initialize()
         return self._engine
     
     async def cleanup(self) -> None:
-        """Cleanup database resources"""
+        """Cleanup database resources for this process"""
         if self._engine:
             await self._engine.dispose()
-            LOGGER.info("Database engine disposed")
+            LOGGER.info(f"Database engine disposed (PID: {os.getpid()})")
         
         self._engine = None
         self._session_factory = None
         self._initialized = False
-        self._instance = None
+        
+        # Remove this process's instance from the class dict
+        pid = os.getpid()
+        if pid in self._instances:
+            del self._instances[pid]
 
-    async def setup_tables(self) -> None:
-        """Setup database tables (dangerous - drops all data!)"""
+    async def create_tables_with_alembic(self) -> None:
+        """Create tables using Alembic migrations instead of direct creation"""
+        import subprocess
+        import sys
+        
         await self.initialize()
         
-        async with self._engine.begin() as conn:
-            await conn.execute(text("DROP SCHEMA public CASCADE;"))
-            await conn.execute(text("CREATE SCHEMA public;"))
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-            await conn.run_sync(Base.metadata.create_all)
+        # Run alembic upgrade
+        try:
+            result = subprocess.run([
+                sys.executable, "-m", "alembic", "upgrade", "head"
+            ], check=True, capture_output=True, text=True)
+            LOGGER.info(f"Alembic upgrade completed: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            LOGGER.error(f"Alembic upgrade failed: {e.stderr}")
+            raise
+
+    async def setup_tables(self) -> None:
+        """Setup database tables using Alembic (safer than direct creation)"""
+        await self.initialize()
         
-        LOGGER.info("Database tables created successfully")
+        # For development/testing - you might still want the nuclear option
+        if os.getenv("FORCE_RECREATE_TABLES"):
+            async with self._engine.begin() as conn:
+                await conn.execute(text("DROP SCHEMA public CASCADE;"))
+                await conn.execute(text("CREATE SCHEMA public;"))
+                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
 
-# Global instance
-db_manager = DatabaseManager()
+        await self.create_tables_with_alembic()
+        
+        LOGGER.info(f"Database setup completed (PID: {os.getpid()})")
 
-# Convenience functions that maintain backward compatibility
-async def init_db():
-    """Initialize database - wrapper for backward compatibility"""
-    await db_manager.initialize()
 
-async def setup_tables():
-    """Setup tables - wrapper for backward compatibility"""
-    await db_manager.setup_tables()
+    @classmethod
+    async def cleanup_all_instances(cls) -> None:
+        """Cleanup all database instances across all processes (for test cleanup)"""
+        for pid, instance in list(cls._instances.items()):
+            await instance.cleanup()
+        cls._instances.clear()
+
+# Global instance getter
+_db_manager = None
+
+def get_db_manager():
+    global _db_manager
+    if _db_manager is None:
+        _db_manager = DatabaseManager()
+    return _db_manager
 
 def get_session():
     """Get session context manager"""
-    return db_manager.get_session()
-
-async def setup():
-    """Setup database connection"""
-    LOGGER.info("Initializing DB engine.")
-    await db_manager.initialize()
-    LOGGER.info("DB connection initialized.")
-
-# Graceful shutdown function
-async def shutdown_db():
-    """Gracefully shutdown database connections"""
-    await db_manager.cleanup()
-
+    return get_db_manager().get_session()
 
 async def get_embeddings(emb_type) -> np.ndarray:  # Structured array (basically a better dict.)
     async with get_session() as s:
@@ -213,17 +233,21 @@ async def get_embeddings(emb_type) -> np.ndarray:  # Structured array (basically
 
     return data
 
-
 if __name__ == "__main__":
     async def main():
         LOGGER.info("Setting up tables.")
         
-        if not input("This will remove all tables and data from the DB. Are you sure? ").lower().startswith("y"):
+        prompt = "This will remove all PROD tables and data from the DB. Are you sure? "
+        if "-t" in sys.argv or "--test" in sys.argv:
+            os.environ["TEST_MODE"] = "true"
+            prompt = "This will remove all TEST tables and data from the DB. Are you sure? "
+
+        if not input(prompt).lower().startswith("y"):
             return
         
         try:
-            await setup_tables()
+            await get_db_manager().setup_tables()
         finally:
-            await shutdown_db()
+            await get_db_manager().cleanup()
     
     asyncio.run(main())

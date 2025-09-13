@@ -184,6 +184,8 @@
               pkgs.libsndfile
 
               pkgs.postgresql_16
+              pkgs.postgresql_16.pg_config
+              pkgs.postgresql16Packages.pgvector
               
               pkgs.rocmPackages.rocm-smi
               pkgs.rocmPackages.rocm-runtime

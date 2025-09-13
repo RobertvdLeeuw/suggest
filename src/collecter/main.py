@@ -32,7 +32,7 @@ if os.getenv("TEST_MODE"):
 
 LOGGER.info("Starting imports...")
 
-from db import setup, get_session
+from db import get_session
 import traceback
 
 import asyncio
@@ -49,7 +49,6 @@ async def main():
     LOGGER.info(f"Python PID: {os.getpid()}")
     LOGGER.debug(f"Current working directory: {os.getcwd()}")
 
-    await setup()
     user = await push_sp_user_to_db()
 
     if "--push-hist" in sys.argv:

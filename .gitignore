@@ -8,6 +8,9 @@ mock_downloads/
 
 .hypothesis/
 
+tmp.py
+testresults.txt
+
 src/music_embed.egg-info/
 src/music_embed.egg-info/*
 spotify_data_isrc.json

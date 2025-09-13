@@ -47,17 +47,20 @@ async def setup_queue(queue_data, session):
         await session.execute(delete(q.q_type))
         session.add_all(queue_data['q_items'])
         await session.commit()
-        
-        asyncio.create_task(start_download_loop([q]))
-        
-        clean_downloads([q])
-        scheduler = BackgroundScheduler()
-        scheduler.add_job(clean_downloads, 'interval', seconds=1, args=([q],))
-        scheduler.start()
     else:
         for i, item in enumerate(queue_data['q_items'][:QUEUE_MAX_LEN]):
             await _download(item.spotify_id, q)
     
+    clean_downloads([q])
+    asyncio.create_task(start_download_loop([q]))
+
+    scheduler = BackgroundScheduler()
+    job = scheduler.add_job(clean_downloads, 'interval', seconds=1, args=([q],))
+    scheduler.start()
+
+    q._scheduler = scheduler
+    q._job = job
+
     return q
 
     # yield q
