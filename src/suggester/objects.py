@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
 from enum import Enum
-
+from datetime import datetime
 from operator import itemgetter
 from functools import reduce
 from copy import deepcopy
@@ -11,7 +11,18 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 from db import get_session
-from models import EmbeddingJukeMIR, EmbeddingAuditus, Funnel as FunnelORM
+from models import (
+    EmbeddingJukeMIR, EmbeddingAuditus, 
+    Funnel as FunnelORM,
+    Metric as MetricORM,
+    Trajectory as TrajectoryORM,
+    Model as ModelORM,
+    FunnelModel as FunnelModelORM,
+    ModelPerformance as ModelPerformanceORM,
+    ParamInstance as ParamInstanceORM,
+    Hyperparameter as HyperparameterORM,
+    HPInstance as HPInstanceORM
+)
 from sqlalchemy import select, delete
 
 import pandas as pd
@@ -32,6 +43,7 @@ class TrainEvent(Enum):  # Used to define when to calc what metric.
 class Metric(ABC):
     name: str
     id: str
+    parent_id: str | None = None
 
     # type: MetricType
     children: list["Metric"] = None
@@ -42,12 +54,13 @@ class Metric(ABC):
 
     arguments: list[str]
 
-    def __init__(self):
+    def __init__(self, parent_id=None):
         if self.children:
             for c in self.children:
                 assert c.on_event == self.on_event, f"{self.name} triggers on event '{self.on_event}' but child '{c.name}' expects event '{c.on_event}'."
                 # assert c.type == self.type, f"{self.name} is of type '{self.type}' but child '{c.type}' is of type '{c.type}'."
-            self.children = [c() for c in self.children]
+            assert hasattr(self, "id"), "Model ID not assigned."
+            self.children = [c(self.id) for c in self.children]
         else: 
             self.children = []
 
@@ -73,6 +86,19 @@ class Metric(ABC):
     def calc_inner():
         pass
 
+    async def upload(self):
+        assert hasattr(self, "id"), "Model ID not assigned."
+        assert hasattr(self, "name"), "Model name not assigned."
+
+        async with get_session() as s:
+            metric = MetricORM(metric_id=self.id,
+                               name=self.name,
+                               type=None,
+                               parent_id=self.parent_id)
+
+            s.add(metric)
+            s.commit()
+
     def __str__(self): return repr(self)
 
     def __repr__(self) -> str:
@@ -92,6 +118,8 @@ class Trajectory:
     model_id: str
     metrics: dict[str, Metric]
     T: int
+    
+    trajectory_id: int = None
 
     def __str__(self): return repr(self)
 
@@ -102,8 +130,24 @@ class Trajectory:
     - {"\n\t- ".join([str(m) for m in self.metrics])}
         """
 
-    @abstractmethod
-    def to_db(self): pass
+     async def upload(self):
+        async with get_session() as s:
+            trajectory = TrajectoryORM(
+                model_id=self.model_id,
+                started=datetime.utcnow(),  # TODO: Better time tracking for PROD use.
+                ended=None, 
+                timesteps=self.T,
+                on_history=False  # TODO: Expose param 
+            )
+            s.add(trajectory)
+            await s.flush()  # Get the ID
+            self.trajectory_id = trajectory.trajectory_id
+            
+            for metric_name, metric in self.metrics.items():
+                metric.trajectory_id = self.trajectory_id
+                await metric.upload()
+            
+            await s.commit()
 
 
 class Model(ABC):
@@ -156,9 +200,109 @@ class Model(ABC):
     def load(cls, hyperparams, params):
         raise NotImplementedError
 
-    # @abstractmethod
-    def to_db(self): 
-        raise NotImplementedError
+  @abstractmethod
+    def hyperparams_serialize(self) -> dict[int, dict]:
+        """
+        Return hyperparameters as dict with hp_id as key.
+        Each value should be: {'type': HyperparameterType, 'min': float, 'max': float}
+        """
+        pass
+    
+    @abstractmethod
+    def params_serialize(self) -> dict:
+        """
+        Return current model parameters as JSON-serializable dict
+        """
+        pass
+    
+    @abstractmethod
+    def hyperparams_instance_serialize(self) -> dict[int, float]:
+        """
+        Return current hyperparameter values as dict with hp_id -> value
+        """
+        pass
+    
+    async def upload(self):
+        async with get_session() as s:
+            model = ModelORM(
+                model_id=self.model_id if hasattr(self, 'model_id') else self.name,
+                model_name=self.name,
+                param_schema=self.param_schema
+            )
+            s.add(model)
+            
+            # Upload hyperparameters using the serialize method
+            hyperparams = self.hyperparams_serialize()
+            for hp_id, hp_config in hyperparams.items():
+                hyperparameter = HyperparameterORM(
+                    model_id=model.model_id,
+                    hp_id=hp_id,
+                    type=hp_config['type'],
+                    min=hp_config.get('min'),
+                    max=hp_config.get('max')
+                )
+                s.add(hyperparameter)
+            
+            await s.commit()
+    
+    async def upload_params(self, trajectory_id: int):
+        """Upload parameter instance for a specific trajectory"""
+        async with get_session() as s:
+            params = self.params_serialize()
+            param_instance = ParamInstanceORM(
+                model_id=self.model_id if hasattr(self, 'model_id') else self.name,
+                trajectory_id=trajectory_id,
+                params=params
+            )
+            s.add(param_instance)
+            await s.commit()
+    
+    async def upload_hp_instance(self, trajectory_id: int):
+        """Upload hyperparameter values for a specific trajectory"""
+        async with get_session() as s:
+            hyperparams = self.hyperparams_serialize()
+            hp_values = self.hyperparams_instance_serialize()
+            
+            for hp_id, hp_value in hp_values.items():
+                hp_type = hyperparams[hp_id]['type']
+                
+                hp_instance = HPInstanceORM(
+                    model_id=self.model_id if hasattr(self, 'model_id') else self.name,
+                    trajectory_id=trajectory_id,
+                    hp_id=hp_id,
+                    type=hp_type,
+                    value=float(hp_value)
+                )
+                s.add(hp_instance)
+            await s.commit()
+    
+    async def upload_params(self, trajectory_id: int, params: dict):
+        """Upload parameter instance for a specific trajectory"""
+        async with get_session() as s:
+            param_instance = ParamInstanceORM(
+                model_id=self.model_id if hasattr(self, 'model_id') else self.name,
+                trajectory_id=trajectory_id,
+                params=params
+            )
+            s.add(param_instance)
+            await s.commit()
+    
+    async def upload_hp_instance(self, trajectory_id: int, hyperparameters: dict):
+        """Upload hyperparameter values for a specific trajectory"""
+        async with get_session() as s:
+            for hp_id, hp_value in hyperparameters.items():
+                # You'll need to determine the type based on your hp schema
+                hp_type = self._get_hp_type(hp_id)  # Implement this method
+                
+                hp_instance = HPInstanceORM(
+                    model_id=self.model_id if hasattr(self, 'model_id') else self.name,
+                    trajectory_id=trajectory_id,
+                    hp_id=hp_id,
+                    type=hp_type,
+                    value=float(hp_value)  # Convert to float as per schema
+                )
+                s.add(hp_instance)
+            await s.commit()
 
     # @abstractmethod
     def validate_params(self):
@@ -197,6 +341,31 @@ class Funnel:
     def suggest(self, items: np.ndarray, song_ids: list[str]) -> list[str]:
         # TODO: This is more complex when latter part of funnel ran run multiple times.
         return reduce(lambda x, model: model.process(*x), self.models, items)
+
+    async def upload(self):
+        async with get_session() as s:
+            # Create funnel record
+            funnel = FunnelORM(
+                funnel_name=self.name
+            )
+            s.add(funnel)
+            await s.flush()  # Get the ID
+            self.funnel_id = funnel.funnel_id
+            
+            # Upload all models first
+            for model in self.models:
+                await model.upload()
+            
+            # Create funnel-model relationships
+            for position, model in enumerate(self.models):
+                funnel_model = FunnelModelORM(
+                    funnel_id=self.funnel_id,
+                    model_id=model.model_id if hasattr(model, 'model_id') else model.name,
+                    position=position
+                )
+                s.add(funnel_model)
+            
+            await s.commit()
 
     def train(songs: any, T: int) -> Trajectory: 
         raise NotImplementedError

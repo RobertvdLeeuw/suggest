@@ -244,7 +244,7 @@ class Model(Base):
     __tablename__ = 'models'
 
     model_id = Column(String(255), primary_key=True)
-    model_name = Column(String(100))
+    model_name = Column(String(100), unique=True)
     param_schema = Column(JSON)
 
     hyperparameters = relationship("Hyperparameter", back_populates="model")
@@ -254,7 +254,7 @@ class Model(Base):
 
     __table_args__ = (
         Index('idx_models_name', 'model_name'),
-        UniqueConstraint('model_name', name='uq_model_name'),
+        # UniqueConstraint('model_name', name='uq_model_name'),
     )
 
 class ModelMetric(Base):
@@ -273,7 +273,7 @@ class Metric(Base):
 
     metric_id = Column(String(255), primary_key=True)
     name = Column(String(255), nullable=False)
-    type = Column(String(255), nullable=False) 
+    type = Column(String(255)) 
 
     performances = relationship("ModelPerformance", back_populates="metric")
 
@@ -318,13 +318,14 @@ class Funnel(Base):
     __tablename__ = 'funnels'
 
     funnel_id = Column(Integer, primary_key=True, autoincrement=True)
-    funnel_name = Column(String(255), nullable=False)
+    funnel_name = Column(String(255), nullable=False, unique=True)
 
     models = relationship("FunnelModel", back_populates="funnel")
+    suggested_songs = relationship("Suggested", back_populates="funnel")
 
     __table_args__ = (
         Index('idx_funnel_name', 'funnel_name'),
-        UniqueConstraint('funnel_name', name='uq_funnel_name'),
+        # UniqueConstraint('funnel_name', name='uq_funnel_name'),
     )
 
 class FunnelModel(Base):
@@ -375,7 +376,7 @@ class Trajectory(Base):
         CheckConstraint('ended IS NULL OR ended >= started', name='chk_trajectory_end_after_start'),
     )
 
-class ParamInstance(Base):
+class ModelInstance(Base):
     __tablename__ = 'param_instances'
 
     model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
@@ -439,7 +440,6 @@ class QueueJukeMIR(Base):
 
     __table_args__ = (
         Index('idx_queue_jukemir_created_at', 'created_at'),
-        UniqueConstraint('spotify_id' , name='uq_spotify_id_jukemir'),
     )
 
 class QueueAuditus(Base):
@@ -450,7 +450,6 @@ class QueueAuditus(Base):
     
     __table_args__ = (
         Index('idx_queue_auditus_created_at', 'created_at'),
-        UniqueConstraint('spotify_id', name='uq_spotify_id_auditus'),
     )
     
 class EmbeddingJukeMIR(Base):
