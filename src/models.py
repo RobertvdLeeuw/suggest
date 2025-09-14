@@ -23,10 +23,6 @@ class StartEndReason(Enum):
     restarted = "restarted"
     unknown = "unknown"
 
-class HyperparameterType(Enum):
-    f32 = "f32"
-    bool = "bool"
-
 Base = declarative_base()
 
 class Song(Base):
@@ -141,6 +137,8 @@ class User(Base):
     spotify_id = Column(String(128), unique=True)
     username = Column(String(255))
 
+    trajectories = relationship("Trajectory", back_populates="user", cascade="all, delete-orphan")
+
     listens = relationship("Listen", back_populates="user", cascade="all, delete-orphan")
     suggested_songs = relationship("Suggested", back_populates="user", cascade="all, delete-orphan")
 
@@ -220,8 +218,6 @@ class Suggested(Base):
     song_id = Column(Integer, ForeignKey('songs.song_id'), primary_key=True)
     user_id = Column(Integer, ForeignKey('users.user_id'), primary_key=True)
 
-    # score = Column(Float, nullable=False)  # f32 in schema
-    # predicted = Column(Float, nullable=False)  # f32 in schema
     suggested_by = Column(Integer, ForeignKey('funnels.funnel_id'), nullable=False)
 
     song = relationship("Song", back_populates="suggested_songs")
@@ -246,11 +242,12 @@ class Model(Base):
     model_id = Column(String(255), primary_key=True)
     model_name = Column(String(100), unique=True)
     param_schema = Column(JSON)
+    hyperparam_schema = Column(JSON)
 
-    hyperparameters = relationship("Hyperparameter", back_populates="model")
-    trajectories = relationship("Trajectory", back_populates="model")
+    # trajectories = relationship("Trajectory", back_populates="model")
 
     metrics = relationship("Metric", secondary="model_metric", back_populates="models")
+    model_instances = relationship("ModelInstance", back_populates="model")
 
     __table_args__ = (
         Index('idx_models_name', 'model_name'),
@@ -274,11 +271,11 @@ class Metric(Base):
     metric_id = Column(String(255), primary_key=True)
     name = Column(String(255), nullable=False)
     type = Column(String(255)) 
-
-    performances = relationship("ModelPerformance", back_populates="metric")
-
     parent_id = Column(String(255), ForeignKey('metrics.metric_id'))
-    
+
+    metric_schema = Column(JSON, nullable=False)
+
+    performances = relationship("Performance", back_populates="metric")
     models = relationship("Model", secondary="model_metric", back_populates="metrics")
 
     parent = relationship("Metric", remote_side=[metric_id], back_populates="children")
@@ -291,14 +288,16 @@ class Metric(Base):
         UniqueConstraint('name', 'type', name='uq_metric_name_type'),
     )
 
-class ModelPerformance(Base):
+class Performance(Base):
     __tablename__ = 'performances'
 
     metric_id = Column(String(255), ForeignKey('metrics.metric_id'), primary_key=True)
     trajectory_id = Column(Integer, ForeignKey('trajectories.trajectory_id'), primary_key=True)
+    model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
     timestep = Column(Integer, primary_key=True)
-    song = Column(String(255))
-    value = Column(Float, nullable=False)
+
+    local_timestep = Column(Integer)  # Nullable for stuff like NNs.
+    data = Column(JSON, nullable=False)
 
     metric = relationship("Metric", back_populates="performances")
     trajectory = relationship("Trajectory", back_populates="performances")
@@ -307,8 +306,6 @@ class ModelPerformance(Base):
         Index('idx_model_performance_metric_id', 'metric_id'),
         Index('idx_model_performance_trajectory_id', 'trajectory_id'),
         Index('idx_model_performance_timestep', 'timestep'),
-        Index('idx_model_performance_song', 'song'),
-        Index('idx_model_performance_value', 'value'),
         Index('idx_model_performance_trajectory_timestep', 'trajectory_id', 'timestep'),
         # Validation constraints
         CheckConstraint('timestep >= 0', name='chk_performance_timestep_positive'),
@@ -352,83 +349,44 @@ class Trajectory(Base):
     __tablename__ = 'trajectories'
 
     trajectory_id = Column(Integer, primary_key=True, autoincrement=True)
-    model_id = Column(String(255), ForeignKey('models.model_id'))
-    # funnel_id = Column(Integer, ForeignKey('funnels.funnel_id'))
+    user_id = Column(Integer, ForeignKey('users.user_id'))
+    funnel_id = Column(Integer, ForeignKey('funnels.funnel_id'))
 
     started = Column(DateTime, nullable=False)
     ended = Column(DateTime)
     timesteps = Column(Integer, nullable=False)
     on_history = Column(Boolean, nullable=False)
 
-    model = relationship("Model", back_populates="trajectories")
-    performances = relationship("ModelPerformance", back_populates="trajectory")
-    param_instances = relationship("ParamInstance", back_populates="trajectory")
+    # models = list of models from funnel-model somehow?
+    user = relationship("User", back_populates="trajectories")
+    performances = relationship("Performance", back_populates="trajectory")
+    model_instances = relationship("ModelInstance", back_populates="trajectory")
 
     __table_args__ = (
-        Index('idx_trajectory_model_id', 'model_id'),
-        # Index('idx_trajectory_funnel_id', 'funnel_id'),
+        Index('idx_trajectory_funnel_id', 'funnel_id'),
         Index('idx_trajectory_started', 'started'),
         Index('idx_trajectory_ended', 'ended'),
         Index('idx_trajectory_on_history', 'on_history'),
-        Index('idx_trajectory_model_started', 'model_id', 'started'),
         # Validation constraints
         CheckConstraint('timesteps > 0', name='chk_trajectory_timesteps_positive'),
         CheckConstraint('ended IS NULL OR ended >= started', name='chk_trajectory_end_after_start'),
     )
 
 class ModelInstance(Base):
-    __tablename__ = 'param_instances'
+    __tablename__ = 'model_instances'
 
     model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
     trajectory_id = Column(Integer, ForeignKey('trajectories.trajectory_id'), primary_key=True)
+
     params = Column(JSON, nullable=False)  # blob in schema, using JSON for SQLAlchemy
+    hyperparams = Column(JSON, nullable=False)
     
     model = relationship("Model")
-    trajectory = relationship("Trajectory", back_populates="param_instances")
+    trajectory = relationship("Trajectory", back_populates="model_instances")
 
     __table_args__ = (
-        Index('idx_param_instances_model_id', 'model_id'),
-        Index('idx_param_instances_trajectory_id', 'trajectory_id'),
-    )
-
-class Hyperparameter(Base):
-    __tablename__ = 'hyperparameters'
-
-    model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
-    hp_id = Column(Integer, primary_key=True)
-    type = Column(SQLEnum(HyperparameterType), nullable=False)  # enum (f32, bool)
-    min = Column(Float)  # f32 in schema
-    max = Column(Float)  # f32 in schema
-
-    model = relationship("Model", back_populates="hyperparameters")
-    hp_instances = relationship("HPInstance", back_populates="hyperparameter")
-
-    __table_args__ = (
-        Index('idx_hyperparameters_model_id', 'model_id'),
-        Index('idx_hyperparameters_type', 'type'),
-        # Validation constraints
-        CheckConstraint('min IS NULL OR max IS NULL OR min <= max', name='chk_hyperparameter_min_max'),
-    )
-
-class HPInstance(Base):
-    __tablename__ = 'hp_instances'
-
-    model_id = Column(String(255), ForeignKey('models.model_id'), primary_key=True)
-    trajectory_id = Column(Integer, ForeignKey('trajectories.trajectory_id'), primary_key=True)
-    hp_id = Column(Integer, primary_key=True)
-    type = Column(SQLEnum(HyperparameterType), nullable=False)  # enum (f32, bool)
-    value = Column(Float, nullable=False)  # f32 in schema
-
-    trajectory = relationship("Trajectory")
-    hyperparameter = relationship("Hyperparameter", back_populates="hp_instances")
-
-    __table_args__ = (
-        Index('idx_hp_instances_model_id', 'model_id'),
-        Index('idx_hp_instances_trajectory_id', 'trajectory_id'),
-        Index('idx_hp_instances_type', 'type'),
-        Index('idx_hp_instances_value', 'value'),
-        ForeignKeyConstraint(['model_id'], ['models.model_id']),
-        ForeignKeyConstraint(['model_id', 'hp_id'], ['hyperparameters.model_id', 'hyperparameters.hp_id']),
+        Index('idx_model_instances_model_id', 'model_id'),
+        Index('idx_model_instances_trajectory_id', 'trajectory_id'),
     )
 
 

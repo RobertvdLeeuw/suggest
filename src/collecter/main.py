@@ -35,6 +35,8 @@ LOGGER.info("Starting imports...")
 from db import get_session
 import traceback
 
+from models import QueueJukeMIR, QueueAuditus
+
 import asyncio
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -59,7 +61,15 @@ async def main():
     try:
         LOGGER.info("Starting embedding worker processes...")
 
-        song_queues = start_processes()
+        model_selection = (([] if "--no-juke" in sys.argv else [QueueJukeMIR]) 
+                          + ([] if "--no-audi" in sys.argv else [QueueAuditus]))
+
+        if "--no-juke" in sys.argv: LOGGER.info("Not using JukeMIR.")
+        if "--no-audi" in sys.argv: LOGGER.info("Not using Auditus.")
+
+        assert model_selection != [], "Ya need at least 1 model, dummy!"
+
+        song_queues = start_processes(model_selection)
         
         scheduler = BackgroundScheduler()
         scheduler.add_job(clean_downloads, 'interval', minutes=1, args=(song_queues,))

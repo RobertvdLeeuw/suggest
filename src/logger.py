@@ -23,6 +23,10 @@ class NumbaFilter(logging.Filter):
     def filter(self, record):
         return "numba.core" not in record.name
 
+class MusicBrainzFilter(logging.Filter):
+    def filter(self, record):
+        return "musicbrainzngs" not in record.name or "parse_attributes" not in record.funcName
+
 class InfoAndAboveNoisyFilter(logging.Filter):
     def filter(self, record):
         if not any(logger in record.name for logger in NOISY_LOGGERS): return True
@@ -63,10 +67,12 @@ def setup_multiprocess_logging(log_path: str = None, console_level=logging.INFO)
     
     file_handler.setFormatter(formatter)
     file_handler.addFilter(NumbaFilter())
+    file_handler.addFilter(MusicBrainzFilter())
     file_handler.addFilter(InfoAndAboveNoisyFilter())
 
     console_handler.setFormatter(formatter)
     console_handler.addFilter(NumbaFilter())
+    console_handler.addFilter(MusicBrainzFilter())
     console_handler.addFilter(WarningAndAboveNoisyFilter())
     
     # Configure root logger

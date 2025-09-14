@@ -44,7 +44,7 @@ def spotdl_lazy_load():
     Spotdl = _Spotdl
 
 CURRENTLY_DOWNLOADING = set()
-async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downloader):
+async def _download(spotify_id: str, song_queue: SongQueue):
     global DOWNLOAD_LOC
     DOWNLOAD_LOC = "./mock_downloads" if os.getenv("TEST_MODE") else "./downloads"
 
@@ -56,70 +56,81 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
             LOGGER.debug(f"Song already downloaded: {fpath}.")
             return
 
-    # TODO: If already embedded, skip
-
     LOGGER.info(f"Starting download for: {spotify_id}")
     CURRENTLY_DOWNLOADING.add(spotify_id)
 
     try:
-        asyncio.create_task(create_push_track(spotify_id))
+        # Create track in database first
+        song = await create_push_track(spotify_id)
 
         spotdl_lazy_load()
         spotdl = Spotdl( 
             no_cache=True,
             spotify_client=get_spotipy(),
-            downloader_settings=DownloaderOptions(format="wav", 
-                                                  simple_tui=False,
-                                                  print_download_errors=False,
-                                                  output="./downloading"),
+            downloader_settings=DownloaderOptions(
+                format="wav", 
+                simple_tui=False,
+                print_download_errors=True,
+                output=DOWNLOAD_LOC,
+                overwrite="skip"
+            ),
             loop=asyncio.get_event_loop()
         )
-        song = spotdl.search(["https://open.spotify.com/track/" + spotify_id])[0]
-
-        if not song:
+        
+        # Fix: search returns a list, get the first item
+        songs = spotdl.search([f"https://open.spotify.com/track/{spotify_id}"])
+        
+        if not songs or len(songs) == 0:
             LOGGER.warning(f"No song found for id: {spotify_id}")
             return
 
-        LOGGER.info(f"Song found for '{spotify_id}: {song.name} by {song.artist}")
+        song_obj = songs[0]  # Get the first (and should be only) song
+        LOGGER.info(f"Song found for '{spotify_id}: {song_obj.name} by {song_obj.artist}")
         
         try:
-            _, file_path = spotdl.download(song)
-            assert file_path and os.path.exists(file_path)
-        except (AssertionError, LookupError, DownloaderError):
-            LOGGER.info(f"{spotify_id} recognized by Spotdl but audio not found on providers.")
+            # Download the song - this also returns a tuple
+            result = spotdl.download(song_obj)
+            song_result, file_path = result
+            
+            if not file_path or not os.path.exists(file_path):
+                raise DownloaderError(f"Download failed or file not found: {file_path}")
+                
+        except (LookupError, DownloaderError, AudioProviderError) as e:
+            LOGGER.warning(f"{spotify_id} download failed: {str(e)}")
 
+            # Remove from queue on failure
             async with get_session() as s:
-                # Remove from queue
                 result = await s.execute(delete(song_queue.q_type)
                                          .where(song_queue.q_type.spotify_id == spotify_id))
                 await s.commit()
 
-            CURRENTLY_DOWNLOADING.remove(spotify_id)
+            CURRENTLY_DOWNLOADING.discard(spotify_id)
             return
 
+        # Rename file to include spotify ID for easier management
         old_path = Path(file_path)
-        with_id = old_path.parent.parent / f"{DOWNLOAD_LOC}/{spotify_id} {old_path.name}"
-
-        LOGGER.debug(f"Renaming '{old_path}' to '{with_id}'.")
-        old_path.rename(with_id)
-        file_path = str(with_id)
+        new_name = f"{spotify_id}_{old_path.name}"
+        new_path = old_path.parent / new_name
+        
+        if old_path != new_path and not new_path.exists():
+            old_path.rename(new_path)
+            file_path = str(new_path)
 
         file_size = os.path.getsize(file_path)
-        LOGGER.debug(f"Download completed: {file_path} ({file_size / (1024*1024):.2f} MB).")
+        LOGGER.info(f"Download completed: {file_path} ({file_size / (1024*1024):.2f} MB)")
 
-        LOGGER.debug(f"Adding {file_path} to processing queues.")
+        # Add to processing queue
         song_queue.put((file_path, spotify_id))
-        CURRENTLY_DOWNLOADING.remove(spotify_id)
+        CURRENTLY_DOWNLOADING.discard(spotify_id)
 
-        LOGGER.info(f"Downloading song '{file_path}' successful.")
+        LOGGER.info(f"Successfully downloaded and queued: {song_obj.name}")
+        
     except KeyboardInterrupt:
+        CURRENTLY_DOWNLOADING.discard(spotify_id)
         raise KeyboardInterrupt
-    except AudioProviderError:
-        LOGGER.warning(f"Downloading song '{spotify_id}' failed: Audio provided failed.")
-        CURRENTLY_DOWNLOADING.remove(spotify_id)
     except Exception as e:
-        LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
-        CURRENTLY_DOWNLOADING.remove(spotify_id)
+        LOGGER.error(f"Unexpected error downloading {spotify_id}: {traceback.format_exc()}")
+        CURRENTLY_DOWNLOADING.discard(spotify_id)
 
 async def start_download_loop(song_queues: list[SongQueue]):
     global DOWNLOAD_LOC
@@ -168,11 +179,9 @@ async def start_download_loop(song_queues: list[SongQueue]):
 
                             queue_items.remove(db_q_item)
 
-                LOGGER.debug(f"Found {len(queue_items)} new items in DB queue for {q.name}.")
+                LOGGER.debug(f"Found {len(queue_items)} new items in DB queue for {q.name}: {"', '".join([q_item for q_item in queue_items])}")
 
                 _ = asyncio.gather(*[_download(q_item, q) for q_item in queue_items])
-
-
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
             except Exception as e:
@@ -185,10 +194,16 @@ def clean_downloads(song_queues: list):
 
     LOGGER.info(f"Cleaning downloads folder ({DOWNLOAD_LOC}), {len(os.listdir(DOWNLOAD_LOC))} downloaded files.")
 
+    # Get all queue items quickly, minimizing lock time
+    protected_ids = set(CURRENTLY_DOWNLOADING)
+    for q in song_queues:
+        with q.lock:  # Explicit, short lock
+            protected_ids.update(x[1] for x in q.queue)
+    
     cnt = 0
-    q_spotify_ids = [x[1] for q in song_queues for x in q.peek_all()]
+    # Now process files without holding any locks
     for file in os.listdir(DOWNLOAD_LOC):
-        for sp_id in set(list(CURRENTLY_DOWNLOADING) + q_spotify_ids):  # Still in the process.
+        for sp_id in protected_ids:
             LOGGER.debug(f"Checking if {sp_id} in {file}")
             if sp_id in file:
                 break

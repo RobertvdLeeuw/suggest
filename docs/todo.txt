@@ -18,3 +18,6 @@ Upload suggestions
   - Constrain suggestions (no prev listened or recommended songs, 
                            just pick arbitrary date to test with hist)
 API endpoints
+
+
+Why not just one modelInstance with (hyper)params blob?
