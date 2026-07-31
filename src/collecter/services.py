@@ -180,6 +180,36 @@ async def queue_new_tracks(spotify_track_ids: list[str], repo: Repository) -> No
     await repo.enqueue_tracks(ids)
 
 
+async def queue_sp_library(
+    repo: Repository,
+    spotify: SpotifyClientProtocol,
+) -> None:
+    """Queues every track in the current user's liked songs and playlists for
+    embedding. Ports old/metadata.py's queue_sp_user - unlike that version this
+    takes an explicit SpotifyClientProtocol rather than reaching for a
+    module-level singleton, same convention as everything else in this file.
+    Always the currently authenticated user, same as push_user(None, ...) -
+    there's no per-user library on someone else's Spotify account to queue."""
+    liked = await spotify.current_user_saved_tracks()
+    liked_ids = [
+        t["track"]["id"] for t in liked["items"] if t.get("track") and t["track"].get("id")
+    ]
+
+    playlists = await spotify.current_user_playlists()
+    playlist_ids = [p["id"] for p in playlists["items"] if p.get("id")]
+
+    playlist_track_ids: list[str] = []
+    for playlist_id in playlist_ids:
+        playlist = await spotify.playlist(playlist_id)
+        playlist_track_ids.extend(
+            t["track"]["id"]
+            for t in playlist["tracks"]["items"]
+            if t.get("track") and t["track"].get("id")
+        )
+
+    await queue_new_tracks(liked_ids + playlist_track_ids, repo)
+
+
 async def queue_history_folder(folder: str, repo: Repository) -> None:
     """Reads every .json file in `folder` (a Spotify Extended Streaming History
     export) and queues its tracks for embedding. The one function in this file
@@ -213,9 +243,7 @@ async def queue_similar_artists(
 
     similar_ids: list[str] = []
     for artist in artists:
-        similar_ids.extend(
-            await resolution.get_similar_artists(artist.spotify_id, spotify, lastfm)
-        )
+        similar_ids.extend(await resolution.get_similar_artists(artist.spotify_id, spotify, lastfm))
 
     tracks: list[str] = []
     for artist_id in similar_ids:
@@ -318,3 +346,39 @@ async def run_recent_listen_loop(
                     "chunks": [{"from_ms": c.from_ms, "to_ms": c.to_ms} for c in event.chunks],
                 },
             )
+
+
+if __name__ == "__main__":
+    """Standalone entrypoint for queue_sp_library - run as
+    `python -m collecter.services` (same package-context requirement as
+    main.py: relative imports below need it run as a module, not a script).
+    Only needs a repo session + Spotify client, unlike main.py's full
+    Spotify/MusicBrainz/LastFM setup - LastFM/MusicBrainz are irrelevant to
+    queuing a library for embedding."""
+    import logging
+    import os
+
+    from dotenv import load_dotenv
+
+    from db import get_session
+
+    from .clients import spotify
+    from .repository import SqlAlchemyRepository
+
+    load_dotenv()
+    logging.basicConfig(level=logging.INFO)
+
+    async def _run():
+        spotify_client = spotify.SpotifyClient(
+            client_id=os.environ["SPOTIFY_CLIENT_ID"],
+            client_secret=os.environ["SPOTIFY_CLIENT_SECRET"],
+            redirect_uri=os.environ.get("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback"),
+            scopes=["user-library-read", "playlist-read-private", "playlist-read-collaborative"],
+            cache_path=os.environ.get("SPOTIFY_CACHE_PATH", ".spotify_cache"),
+        )
+
+        async with get_session() as session:
+            repo = SqlAlchemyRepository(session)
+            await queue_sp_library(repo, spotify_client)
+
+    asyncio.run(_run())

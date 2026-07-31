@@ -16,10 +16,10 @@ RUN uv pip install --system -e .[collecter,db]
 
 RUN pip install spotdl
 
-COPY src/collecter/* .
-COPY src/db.py .
-COPY src/models.py .
-COPY src/logger.py .
+# Preserves src/'s layout (collecter/ as a package alongside db.py, models.py,
+# logger.py) - collecter/main.py and friends use relative imports (`from . import
+# services`), which only resolve if collecter/ stays a package under /app, not
+# flattened into it.
+COPY src/ .
 
-CMD ["python", "main.py"]
-
+CMD ["python", "-m", "collecter.main"]
