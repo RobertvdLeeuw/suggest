@@ -17,7 +17,7 @@ Rules for this file:
     sequences and zero network/DB.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 
 @dataclass
@@ -45,6 +45,29 @@ class TrackingState:
     latest_chunk_start: int = 0
 
 
+def _close_chunk(chunks: list[ListenChunk], from_ms: int, to_ms: int) -> list[ListenChunk]:
+    """Appends a chunk covering [from_ms, to_ms) - unless it'd be zero-width."""
+    return [*chunks, ListenChunk(from_ms, to_ms)] if to_ms > from_ms else chunks
+
+
+def _classify_conclusion(
+    ms_played: int,
+    duration_ms: int,
+    new_track_id: str,
+    next_in_queue_id: str | None,
+    was_playing: bool,
+) -> tuple[str, str]:
+    """Decides (reason_end, new_reason_start) for a listen that just concluded
+    because the track changed."""
+    if ms_played >= duration_ms * 0.75:
+        return "trackdone", "trackdone"
+    if new_track_id == next_in_queue_id:
+        return "skipped", "skipped"
+    if not was_playing:
+        return "paused", "selected"
+    return "unknown", "unknown"
+
+
 def process_playback_tick(
     state: TrackingState,
     new_snapshot: dict | None,
@@ -54,4 +77,93 @@ def process_playback_tick(
     """Advances the state machine by one poll tick. Returns the new state, and a
     ListenEvent if a listen just concluded (song changed, restarted, etc.) and should
     be persisted by the caller - None otherwise."""
-    ...
+    if (
+        not new_snapshot
+        or not new_snapshot.get("item")
+        or not new_snapshot["is_playing"]
+        or new_snapshot["item"]["type"] != "track"
+    ):
+        return replace(state, next_in_queue_id=next_in_queue_id), None
+
+    ms_played = state.ms_played + sleep_time_s * 1000
+
+    if state.current_listen is None:
+        return (
+            replace(
+                state,
+                current_listen=new_snapshot,
+                next_in_queue_id=next_in_queue_id,
+                ms_played=ms_played,
+            ),
+            None,
+        )
+
+    current_listen = state.current_listen
+    chunks = state.chunks
+    latest_chunk_start = state.latest_chunk_start
+    reason_start = state.reason_start
+
+    if current_listen["item"]["id"] == new_snapshot["item"]["id"]:
+        near_start = current_listen["item"]["duration_ms"] * 0.1
+        event = None
+
+        if new_snapshot["progress_ms"] < current_listen["progress_ms"]:
+            chunks = _close_chunk(chunks, latest_chunk_start, current_listen["progress_ms"])
+            latest_chunk_start = new_snapshot["progress_ms"]
+
+            if new_snapshot["progress_ms"] < near_start:  # Restart.
+                event = ListenEvent(
+                    spotify_id=current_listen["item"]["id"],
+                    ms_played=ms_played,
+                    reason_start=reason_start,
+                    reason_end="restarted",
+                    chunks=chunks,
+                )
+                reason_start = "restarted"
+                chunks = []
+                latest_chunk_start = 0
+        elif new_snapshot["progress_ms"] - current_listen["progress_ms"] > sleep_time_s * 5000:
+            chunks = _close_chunk(chunks, latest_chunk_start, current_listen["progress_ms"])
+            latest_chunk_start = new_snapshot["progress_ms"]
+
+        return (
+            TrackingState(
+                current_listen=new_snapshot,
+                reason_start=reason_start,
+                next_in_queue_id=next_in_queue_id,
+                ms_played=ms_played,
+                chunks=chunks,
+                latest_chunk_start=latest_chunk_start,
+            ),
+            event,
+        )
+
+    # New song - the previous one just concluded.
+    reason_end, new_reason_start = _classify_conclusion(
+        ms_played,
+        current_listen["item"]["duration_ms"],
+        new_snapshot["item"]["id"],
+        next_in_queue_id,
+        current_listen["is_playing"],
+    )
+    chunks = _close_chunk(chunks, latest_chunk_start, current_listen["progress_ms"])
+
+    event = ListenEvent(
+        spotify_id=current_listen["item"]["id"],
+        ms_played=ms_played,
+        reason_start=reason_start,
+        reason_end=reason_end,
+        chunks=chunks,
+    )
+
+    return (
+        TrackingState(
+            current_listen=new_snapshot,
+            reason_start=new_reason_start,
+            next_in_queue_id=next_in_queue_id,
+            ms_played=0,
+            chunks=[],
+            latest_chunk_start=0,
+        ),
+        event,
+    )
