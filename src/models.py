@@ -130,6 +130,42 @@ class SongMetadata(Base):
     )
 
 
+class PendingArtistMetadata(Base):
+    """One row per (artist, source) currently unavailable - resolution.py's
+    resolve_artist reported that source as UNAVAILABLE (errored, not a confident
+    'no match'). services.retry_pending_metadata sweeps this table on a schedule
+    and clears rows for sources that succeed on retry. Composite PK doubles as the
+    dedup key for get_or_create_many, and also means re-marking an already-pending
+    source is a no-op (ON CONFLICT DO NOTHING) rather than refreshing created_at -
+    intentional, so a source that keeps failing gets retried every sweep, not
+    pushed back further each time."""
+    __tablename__ = 'pending_artist_metadata'
+
+    artist_id = Column(Integer, ForeignKey('artists.artist_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
+    source = Column(String(100), primary_key=True)
+    created_at = Column(DateTime, default=func.now())
+
+    artist = relationship("Artist")
+
+    __table_args__ = (
+        Index('idx_pending_artist_metadata_created_at', 'created_at'),
+    )
+
+class PendingSongMetadata(Base):
+    """Same as PendingArtistMetadata, for songs."""
+    __tablename__ = 'pending_song_metadata'
+
+    song_id = Column(Integer, ForeignKey('songs.song_id', onupdate='CASCADE', ondelete='CASCADE'), primary_key=True)
+    source = Column(String(100), primary_key=True)
+    created_at = Column(DateTime, default=func.now())
+
+    song = relationship("Song")
+
+    __table_args__ = (
+        Index('idx_pending_song_metadata_created_at', 'created_at'),
+    )
+
+
 class User(Base):
     __tablename__ = 'users'
 

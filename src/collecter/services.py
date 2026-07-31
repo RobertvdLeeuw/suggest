@@ -16,15 +16,46 @@ Rules for this file:
     own, so services.py mostly needs a handful of orchestration-ordering
     tests (e.g. "doesn't call resolve when repo already has it") rather than
     exhaustive coverage.
+
+On resolution.py's `unavailable` (see its module docstring): every push_*
+function that creates a new Artist/Song writes the row with whatever tags it
+got AND records any unavailable sources via repo.mark_*_metadata_pending -
+never blocks the write entirely. Blocking would mean a LastFM hiccup stops
+new listens from being recorded at all, which is worse than a temporarily
+under-tagged row. retry_pending_metadata is what closes the gap later, on
+its own schedule (see main.py) - not by hoping something re-pushes the same
+artist/song again.
 """
 
 import asyncio
+import os
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from models import Artist, Listen, Song, User
 
+from . import mapping, resolution
 from .clients import LastFMClientProtocol, MusicBrainzClientProtocol, SpotifyClientProtocol
 from .listen_tracking import TrackingState, process_playback_tick
 from .repository import Repository
+
+# Spotify's own reason codes -> the StartEndReason vocabulary listen_tracking.py/
+# models.py use. Ported from old/metadata.py's START_REASON_MAP/END_REASON_MAP -
+# only used for extended-history imports; the live polling loop (listen_tracking.py)
+# classifies reasons itself, it never sees these raw Spotify codes.
+_HISTORY_START_REASON_MAP = defaultdict(
+    lambda: "unknown",
+    {
+        "clickrow": "selected",
+        "fwdbtn": "selected",
+        "trackdone": "trackdone",
+        "backbtn": "restarted",
+    },
+)
+_HISTORY_END_REASON_MAP = defaultdict(
+    lambda: "unknown",
+    {"clickrow": "skipped", "fwdbtn": "skipped", "trackdone": "trackdone", "backbtn": "restarted"},
+)
 
 
 async def push_artist(
@@ -35,7 +66,18 @@ async def push_artist(
     lastfm: LastFMClientProtocol,
 ) -> Artist:
     """Repo lookup first; only resolves against external APIs on a miss."""
-    ...
+    artist = await repo.get_artist_by_spotify_id(spotify_id)
+    if artist is not None:
+        return artist
+
+    resolved = await resolution.resolve_artist(spotify_id, spotify, musicbrainz, lastfm)
+    artist_orm = mapping.artist_to_orm(resolved)
+    artist = await repo.create_artist(artist_orm, artist_orm.extra_data)
+
+    if resolved.unavailable:
+        await repo.mark_artist_metadata_pending(artist.artist_id, resolved.unavailable)
+
+    return artist
 
 
 async def push_track(
@@ -47,7 +89,23 @@ async def push_track(
 ) -> Song:
     """Repo lookup first; only resolves against external APIs on a miss.
     Resolves/pushes each artist on the track via push_artist."""
-    ...
+    song = await repo.get_song_by_spotify_id(spotify_id)
+    if song is not None:
+        return song
+
+    resolved = await resolution.resolve_track(spotify_id, spotify, musicbrainz, lastfm)
+    artists = [
+        await push_artist(artist.spotify_id, repo, spotify, musicbrainz, lastfm)
+        for artist in resolved.artists
+    ]
+
+    song_orm = mapping.track_to_orm(resolved, artists)
+    song = await repo.create_song(song_orm, artists, song_orm.extra_data)
+
+    if resolved.unavailable:
+        await repo.mark_song_metadata_pending(song.song_id, resolved.unavailable)
+
+    return song
 
 
 async def push_user(
@@ -56,7 +114,8 @@ async def push_user(
     spotify: SpotifyClientProtocol,
 ) -> User:
     """spotify_id=None means 'the currently authenticated user'."""
-    ...
+    sp_user = await spotify.current_user()
+    return await repo.get_or_create_user(spotify_id or sp_user["id"], sp_user["display_name"])
 
 
 async def add_song_listens(
@@ -68,7 +127,24 @@ async def add_song_listens(
     lastfm: LastFMClientProtocol,
 ) -> None:
     """Ensures each track is pushed (push_track) before recording the listen."""
-    ...
+    for track in tracks:
+        missing = [f for f in ("spotify_id", "ms_played") if f not in track]
+        if missing:
+            continue  # malformed entry - old code logged and skipped, same here
+
+        song = await push_track(track["spotify_id"], repo, spotify, musicbrainz, lastfm)
+        await repo.add_listen(
+            user_id,
+            song.song_id,
+            {
+                "ms_played": track["ms_played"],
+                "reason_start": track.get("reason_start"),
+                "reason_end": track.get("reason_end"),
+                "listened_at": track.get("listened_at"),
+                "chunks": track.get("chunks", []),
+                "from_history": track.get("from_history", False),
+            },
+        )
 
 
 async def add_history_listens(
@@ -81,13 +157,49 @@ async def add_history_listens(
 ) -> None:
     """Maps raw Spotify extended-history entries (reason codes etc.) and delegates
     to add_song_listens."""
-    ...
+    mapped = [
+        {
+            **listen,
+            "from_history": True,
+            "spotify_id": listen["spotify_track_uri"].split(":")[-1],
+            "listened_at": listen["ts"],
+            "reason_start": _HISTORY_START_REASON_MAP[listen["reason_start"]],
+            "reason_end": _HISTORY_END_REASON_MAP[listen["reason_end"]],
+        }
+        for listen in history
+        if listen.get("spotify_track_uri") is not None and listen.get("spotify_episode_uri") is None
+    ]
+
+    user = await push_user(user_spotify_id, repo, spotify)
+    await add_song_listens(user.user_id, mapped, repo, spotify, musicbrainz, lastfm)
+    await queue_new_tracks([listen["spotify_id"] for listen in mapped], repo)
 
 
-async def queue_new_tracks(spotify_track_ids: list[str], repo: Repository) -> None: ...
+async def queue_new_tracks(spotify_track_ids: list[str], repo: Repository) -> None:
+    ids = [tid for tid in spotify_track_ids if tid is not None]
+    await repo.enqueue_tracks(ids)
 
 
-async def queue_history_folder(folder: str, repo: Repository) -> None: ...
+async def queue_history_folder(folder: str, repo: Repository) -> None:
+    """Reads every .json file in `folder` (a Spotify Extended Streaming History
+    export) and queues its tracks for embedding. The one function in this file
+    that does filesystem I/O rather than DB/network - that's fine, it's still
+    just gathering ids to hand to queue_new_tracks, not a second responsibility."""
+    import json
+
+    for filename in os.listdir(folder):
+        if not filename.endswith(".json"):
+            continue
+
+        with open(os.path.join(folder, filename)) as f:
+            chunk = json.load(f)
+
+        track_ids = [
+            listen["spotify_track_uri"].split(":")[-1]
+            for listen in chunk
+            if listen.get("spotify_track_uri")
+        ]
+        await queue_new_tracks(track_ids, repo)
 
 
 async def queue_similar_artists(
@@ -97,7 +209,62 @@ async def queue_similar_artists(
 ) -> None:
     """Picks known artists at random, finds similar ones via resolution.get_similar_artists,
     and queues their tracks."""
-    ...
+    artists = await repo.get_random_artists(10)
+
+    similar_ids: list[str] = []
+    for artist in artists:
+        similar_ids.extend(
+            await resolution.get_similar_artists(artist.spotify_id, spotify, lastfm)
+        )
+
+    tracks: list[str] = []
+    for artist_id in similar_ids:
+        albums = await spotify.artist_albums(artist_id)
+        for album in albums["items"]:
+            album_tracks = await spotify.album_tracks(album["id"])
+            tracks.extend(t["id"] for t in album_tracks["items"])
+
+    await queue_new_tracks(tracks, repo)
+
+
+async def retry_pending_metadata(
+    repo: Repository,
+    spotify: SpotifyClientProtocol,
+    musicbrainz: MusicBrainzClientProtocol,
+    lastfm: LastFMClientProtocol,
+    older_than: timedelta = timedelta(days=1),
+) -> None:
+    """Re-resolves any artist/song with a source still marked pending (UNAVAILABLE
+    on a previous attempt) for at least `older_than`, and clears whichever sources
+    succeed this time. Meant to run on a schedule (see main.py) - the schedule's own
+    interval is the retry backoff, so there's no per-row timestamp math here: a
+    source that fails again just stays in the pending table, to be picked up by the
+    next scheduled run.
+
+    Re-creating an artist/song that already exists is safe - repository.create_artist/
+    create_song both go through get_or_create/get_or_create_many, so this only adds
+    whatever tags are newly available, it never duplicates or overwrites anything."""
+    cutoff = datetime.now(timezone.utc) - older_than
+
+    for artist in await repo.get_stale_pending_artists(cutoff):
+        resolved = await resolution.resolve_artist(artist.spotify_id, spotify, musicbrainz, lastfm)
+        artist_orm = mapping.artist_to_orm(resolved)
+        await repo.create_artist(artist_orm, artist_orm.extra_data)
+
+        newly_resolved = resolution.KNOWN_SOURCES - resolved.unavailable
+        await repo.clear_artist_metadata_pending(artist.artist_id, newly_resolved)
+
+    for song in await repo.get_stale_pending_songs(cutoff):
+        resolved = await resolution.resolve_track(song.spotify_id, spotify, musicbrainz, lastfm)
+        artists = [
+            await push_artist(artist.spotify_id, repo, spotify, musicbrainz, lastfm)
+            for artist in resolved.artists
+        ]
+        song_orm = mapping.track_to_orm(resolved, artists)
+        await repo.create_song(song_orm, artists, song_orm.extra_data)
+
+        newly_resolved = resolution.KNOWN_SOURCES - resolved.unavailable
+        await repo.clear_song_metadata_pending(song.song_id, newly_resolved)
 
 
 async def run_recent_listen_loop(

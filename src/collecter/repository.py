@@ -36,12 +36,23 @@ import logging
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Protocol, TypeVar
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Artist, ArtistMetadata, Listen, ListenChunk, Song, SongArtist, SongMetadata, User
+from models import (
+    Artist,
+    ArtistMetadata,
+    Listen,
+    ListenChunk,
+    PendingArtistMetadata,
+    PendingSongMetadata,
+    Song,
+    SongArtist,
+    SongMetadata,
+    User,
+)
 
 from .clients.retry import with_backoff
 
@@ -67,6 +78,16 @@ class Repository(Protocol):
         """Adds tracks to the JukeMIR/Auditus embedding queues, skipping any already
         queued or already embedded."""
         ...
+
+    async def get_random_artists(self, n: int) -> list[Artist]: ...
+
+    async def mark_artist_metadata_pending(self, artist_id: int, sources: set[str]) -> None: ...
+    async def clear_artist_metadata_pending(self, artist_id: int, sources: set[str]) -> None: ...
+    async def get_stale_pending_artists(self, older_than: datetime) -> list[Artist]: ...
+
+    async def mark_song_metadata_pending(self, song_id: int, sources: set[str]) -> None: ...
+    async def clear_song_metadata_pending(self, song_id: int, sources: set[str]) -> None: ...
+    async def get_stale_pending_songs(self, older_than: datetime) -> list[Song]: ...
 
 
 def _classify_db_error(exc: Exception) -> tuple[str, float] | str:
@@ -298,6 +319,95 @@ class SqlAlchemyRepository:
                     )
 
         await self._run_transactional(_unit)
+
+    # --- Random sampling (queue_similar_artists) ---------------------------
+
+    async def get_random_artists(self, n: int) -> list[Artist]:
+        result = await self._session.execute(select(Artist).order_by(func.random()).limit(n))
+        return list(result.scalars().all())
+
+    # --- Pending metadata (resolution sources marked UNAVAILABLE) ---------
+    #
+    # mark_*/clear_* both go through get_or_create_many/a plain DELETE rather
+    # than an upsert - re-marking an already-pending source is a deliberate
+    # no-op (see PendingArtistMetadata's docstring in models.py), and clearing
+    # a source that was never pending is just as harmless a no-op. Neither
+    # needs _run_transactional's retry-the-whole-unit machinery: both are a
+    # single statement, and get_or_create_many is already race-safe on its own.
+
+    async def mark_artist_metadata_pending(self, artist_id: int, sources: set[str]) -> None:
+        if not sources:
+            return
+
+        async def _unit() -> None:
+            await get_or_create_many(
+                self._session,
+                PendingArtistMetadata,
+                rows=[{"artist_id": artist_id, "source": s} for s in sources],
+                unique_cols=("artist_id", "source"),
+            )
+
+        await self._run_transactional(_unit)
+
+    async def clear_artist_metadata_pending(self, artist_id: int, sources: set[str]) -> None:
+        if not sources:
+            return
+
+        async def _unit() -> None:
+            await self._session.execute(
+                delete(PendingArtistMetadata).where(
+                    PendingArtistMetadata.artist_id == artist_id,
+                    PendingArtistMetadata.source.in_(sources),
+                )
+            )
+
+        await self._run_transactional(_unit)
+
+    async def get_stale_pending_artists(self, older_than: datetime) -> list[Artist]:
+        result = await self._session.execute(
+            select(Artist)
+            .join(PendingArtistMetadata, PendingArtistMetadata.artist_id == Artist.artist_id)
+            .where(PendingArtistMetadata.created_at < older_than)
+            .distinct()
+        )
+        return list(result.scalars().all())
+
+    async def mark_song_metadata_pending(self, song_id: int, sources: set[str]) -> None:
+        if not sources:
+            return
+
+        async def _unit() -> None:
+            await get_or_create_many(
+                self._session,
+                PendingSongMetadata,
+                rows=[{"song_id": song_id, "source": s} for s in sources],
+                unique_cols=("song_id", "source"),
+            )
+
+        await self._run_transactional(_unit)
+
+    async def clear_song_metadata_pending(self, song_id: int, sources: set[str]) -> None:
+        if not sources:
+            return
+
+        async def _unit() -> None:
+            await self._session.execute(
+                delete(PendingSongMetadata).where(
+                    PendingSongMetadata.song_id == song_id,
+                    PendingSongMetadata.source.in_(sources),
+                )
+            )
+
+        await self._run_transactional(_unit)
+
+    async def get_stale_pending_songs(self, older_than: datetime) -> list[Song]:
+        result = await self._session.execute(
+            select(Song)
+            .join(PendingSongMetadata, PendingSongMetadata.song_id == Song.song_id)
+            .where(PendingSongMetadata.created_at < older_than)
+            .distinct()
+        )
+        return list(result.scalars().all())
 
 
 async def get_or_create(
