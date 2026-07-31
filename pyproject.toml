@@ -42,7 +42,7 @@ db = [
 collecter = [
     "nest-asyncio>=1.6.0",
     "pylast>=5.5.0",
-    "spotdl-lean>=4.2.11",
+    "spotdl-lean>=4.2.12",
     "spotipy>=2.25.1",
     "musicbrainzngs>=0.7.1",
 

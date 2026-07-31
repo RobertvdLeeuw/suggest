@@ -1,0 +1,49 @@
+"""
+Purpose & scope
+---------------
+Interfaces only, no implementations. resolution.py and services.py type-hint
+against these, never against the concrete modules/classes in spotify.py,
+musicbrainz.py, or lastfm.py - that's what lets tests swap in fakes without
+patching.
+
+All methods are async: the real implementations run their (synchronous)
+underlying libraries via asyncio.to_thread, so callers always await them.
+
+SpotifyClientProtocol stays instance-shaped (self) because Spotify is the one
+source needing per-instance state - each user on the machine gets their own
+SpotifyClient with its own OAuth token/refresh cycle. MusicBrainz and LastFM
+are used for general lookups only, never per-user, so their real
+implementations are plain modules rather than classes - a Protocol still
+describes them correctly here since structural typing matches a module's
+top-level async functions against a Protocol method with `self` omitted from
+the call site either way.
+"""
+
+from typing import Protocol
+
+
+class SpotifyClientProtocol(Protocol):
+    async def artist(self, artist_id: str) -> dict: ...
+    async def artist_top_tracks(self, artist_id: str) -> dict: ...
+    async def track(self, track_id: str) -> dict: ...
+    async def search(self, query: str, type: str) -> dict: ...
+    async def current_user(self) -> dict: ...
+    async def current_user_saved_tracks(self, limit: int) -> dict: ...
+    async def current_user_playlists(self, limit: int) -> dict: ...
+    async def playlist(self, playlist_id: str) -> dict: ...
+    async def album_tracks(self, album_id: str, limit: int) -> dict: ...
+    async def artist_albums(self, artist_id: str, limit: int) -> dict: ...
+    async def current_playback(self) -> dict | None: ...
+    async def queue(self) -> dict: ...
+
+
+class MusicBrainzClientProtocol(Protocol):
+    async def search_recordings(self, query: str, limit: int | None = None) -> dict: ...
+    async def get_artist_by_id(self, artist_id: str, includes: list[str] | None = None) -> dict: ...
+    async def get_recording_by_id(
+        self, recording_id: str, includes: list[str] | None = None
+    ) -> dict: ...
+
+
+class LastFMClientProtocol(Protocol):
+    async def get_track(self, artist: str, title: str): ...  # returns a pylast.Track-like object
