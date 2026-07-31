@@ -19,12 +19,10 @@ import logging
 import multiprocessing as mp
 import traceback
 
-from sqlalchemy import delete, exists, select
-
-from collecter.metadata import create_push_track
 from db import get_session
 from models import EmbeddingAuditus, EmbeddingJukeMIR, QueueAuditus, QueueJukeMIR
 
+from ..repository import SqlAlchemyRepository
 from . import auditus, jukemir
 from .song_queue import QUEUE_MAX_LEN, QueueObject, SongQueue
 
@@ -50,24 +48,33 @@ async def _async_embed_wrapper(embed_func: callable, name: str, queue: SongQueue
             song_file, spotify_id = queue.peek()
 
             async with get_session() as s:
-                song = await create_push_track(spotify_id)
+                repo = SqlAlchemyRepository(s)
 
-                result = await s.execute(select(exists().where(emb_type.song_id == song.song_id)))
-                if not result.scalar():
+                song = await repo.get_song_by_spotify_id(spotify_id)
+                if song is None:
+                    # Shouldn't happen: the downloader pushes the Song row before
+                    # ever queueing it (see old/downloader.py's ordering) - a miss
+                    # here means that invariant was violated somewhere upstream.
+                    # No song_id to embed against, so there's nothing to do but
+                    # drop it from the queue and move on.
+                    LOGGER.warning(
+                        f"{name}: no Song row for spotify_id={spotify_id}, "
+                        f"expected it to already be pushed. Dropping from queue."
+                    )
+                    await repo.dequeue_track(queue.q_type, spotify_id)
+                    queue.get()
+                    continue
+
+                if not await repo.is_song_embedded(song.song_id, emb_type):
                     LOGGER.debug(f"Start embed, {name}, {song.song_name}.")
                     embeddings = embed_func(song_file, song.song_id)
-                    s.add_all(embeddings)
+                    await repo.save_embeddings(embeddings)
                 else:
                     LOGGER.warning(
                         f"About to embed {song.song_name} using {name}, but it's already embedded."
                     )
 
-                # Remove from queue
-                result = await s.execute(
-                    delete(queue.q_type).where(queue.q_type.spotify_id == spotify_id)
-                )
-
-                await s.commit()
+                await repo.dequeue_track(queue.q_type, spotify_id)
                 LOGGER.debug(f"Pushed {name} embeddings of '{song_file}' to DB.")
 
             LOGGER.info(f"Embedding '{song_file}' using {name} successful.")

@@ -36,7 +36,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Protocol, TypeVar
 
-from sqlalchemy import and_, delete, func, or_, select
+from sqlalchemy import and_, delete, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,10 +44,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models import (
     Artist,
     ArtistMetadata,
+    EmbeddingAuditus,
+    EmbeddingJukeMIR,
     Listen,
     ListenChunk,
     PendingArtistMetadata,
     PendingSongMetadata,
+    QueueAuditus,
+    QueueJukeMIR,
     Song,
     SongArtist,
     SongMetadata,
@@ -78,6 +82,18 @@ class Repository(Protocol):
         """Adds tracks to the JukeMIR/Auditus embedding queues, skipping any already
         queued or already embedded."""
         ...
+
+    async def save_embeddings(
+        self, embeddings: list[EmbeddingJukeMIR] | list[EmbeddingAuditus]
+    ) -> None: ...
+
+    async def is_song_embedded(
+        self, song_id: int, embedding_model: type[EmbeddingJukeMIR] | type[EmbeddingAuditus]
+    ) -> bool: ...
+
+    async def dequeue_track(
+        self, queue_model: type[QueueJukeMIR] | type[QueueAuditus], spotify_id: str
+    ) -> None: ...
 
     async def get_random_artists(self, n: int) -> list[Artist]: ...
 
@@ -317,6 +333,35 @@ class SqlAlchemyRepository:
                         rows=[{"spotify_id": sid} for sid in to_queue],
                         unique_cols=("spotify_id",),
                     )
+
+        await self._run_transactional(_unit)
+
+    async def save_embeddings(
+        self, embeddings: list[EmbeddingJukeMIR] | list[EmbeddingAuditus]
+    ) -> None:
+        if not embeddings:
+            return
+
+        async def _unit() -> None:
+            self._session.add_all(embeddings)
+
+        await self._run_transactional(_unit)
+
+    async def is_song_embedded(
+        self, song_id: int, embedding_model: type[EmbeddingJukeMIR] | type[EmbeddingAuditus]
+    ) -> bool:
+        result = await self._session.execute(
+            select(exists().where(embedding_model.song_id == song_id))
+        )
+        return bool(result.scalar())
+
+    async def dequeue_track(
+        self, queue_model: type[QueueJukeMIR] | type[QueueAuditus], spotify_id: str
+    ) -> None:
+        async def _unit() -> None:
+            await self._session.execute(
+                delete(queue_model).where(queue_model.spotify_id == spotify_id)
+            )
 
         await self._run_transactional(_unit)
 
