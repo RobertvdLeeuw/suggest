@@ -23,10 +23,9 @@ import pylast
 from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
 
-from db import get_session
-from logger import setup_multiprocess_logging
-from models import QueueAuditus, QueueJukeMIR
-
+from ..db import get_session
+from ..logger import setup_multiprocess_logging
+from ..models import QueueAuditus, QueueJukeMIR
 from . import embedders, services
 from .clients import lastfm, musicbrainz, spotify
 from .repository import SqlAlchemyRepository
@@ -61,7 +60,9 @@ PUSH_HISTORY = "--push-hist" in sys.argv
 EMBEDDER_SELECTION = ([] if "--no-juke" in sys.argv else [QueueJukeMIR]) + (
     [] if "--no-audi" in sys.argv else [QueueAuditus]
 )
-assert EMBEDDER_SELECTION, "Need at least 1 embedding model - don't pass both --no-juke and --no-audi."
+assert EMBEDDER_SELECTION, (
+    "Need at least 1 embedding model - don't pass both --no-juke and --no-audi."
+)
 
 setup_multiprocess_logging(console_level=LOG_LEVEL)
 LOGGER = logging.getLogger(__name__)

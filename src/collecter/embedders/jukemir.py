@@ -19,7 +19,7 @@ import logging
 import os
 from math import floor
 
-from models import EmbeddingJukeMIR
+from ...models import EmbeddingJukeMIR
 
 LOGGER = logging.getLogger(__name__)
 

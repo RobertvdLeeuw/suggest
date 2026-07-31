@@ -32,8 +32,7 @@ import os
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from models import Artist, Listen, Song, User
-
+from ..models import Artist, Listen, Song, User
 from . import mapping, resolution
 from .clients import LastFMClientProtocol, MusicBrainzClientProtocol, SpotifyClientProtocol
 from .listen_tracking import TrackingState, process_playback_tick

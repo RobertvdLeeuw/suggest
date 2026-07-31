@@ -11,8 +11,7 @@ an (unpersisted) ORM object comes out. repository.py is what actually saves
 it and hands back the canonical, DB-backed row.
 """
 
-from models import Artist, ArtistMetadata, MetadataType, Song, SongMetadata
-
+from ..models import Artist, ArtistMetadata, MetadataType, Song, SongMetadata
 from .resolution import ResolvedArtist, ResolvedTrack
 
 # resolution.py's tags dict keys ("lastfm", "musicbrainz") -> the `source`

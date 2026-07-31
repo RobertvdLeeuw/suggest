@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 import pylast
 
-from .clients import SpotifyClientProtocol, MusicBrainzClientProtocol, LastFMClientProtocol
+from .clients import LastFMClientProtocol, MusicBrainzClientProtocol, SpotifyClientProtocol
 
 KNOWN_SOURCES = frozenset({"lastfm", "musicbrainz"})
 

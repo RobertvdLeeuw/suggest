@@ -19,9 +19,8 @@ import logging
 import multiprocessing as mp
 import traceback
 
-from db import get_session
-from models import EmbeddingAuditus, EmbeddingJukeMIR, QueueAuditus, QueueJukeMIR
-
+from ...db import get_session
+from ...models import EmbeddingAuditus, EmbeddingJukeMIR, QueueAuditus, QueueJukeMIR
 from ..repository import SqlAlchemyRepository
 from . import auditus, jukemir
 from .song_queue import QUEUE_MAX_LEN, QueueObject, SongQueue

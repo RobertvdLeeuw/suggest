@@ -41,7 +41,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import (
+from ..models import (
     Artist,
     ArtistMetadata,
     EmbeddingAuditus,
@@ -57,7 +57,6 @@ from models import (
     SongMetadata,
     User,
 )
-
 from .clients.retry import with_backoff
 
 LOGGER = logging.getLogger(__name__)

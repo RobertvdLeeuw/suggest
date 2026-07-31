@@ -22,7 +22,7 @@ import os
 import time
 from typing import Protocol
 
-from models import EmbeddingAuditus, EmbeddingJukeMIR, QueueAuditus, QueueJukeMIR
+from ...models import EmbeddingAuditus, EmbeddingJukeMIR, QueueAuditus, QueueJukeMIR
 
 LOGGER = logging.getLogger(__name__)
 

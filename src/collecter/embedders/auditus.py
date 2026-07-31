@@ -22,7 +22,7 @@ from math import floor
 
 import numpy as np
 
-from models import EmbeddingAuditus
+from ...models import EmbeddingAuditus
 
 LOGGER = logging.getLogger(__name__)
 
