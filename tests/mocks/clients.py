@@ -5,6 +5,7 @@ random, unlike the old tests/mocks/apis.py fakes - hypothesis strategies drive
 the randomness instead, these just need to return what they're told to."""
 
 from collecter.clients import SpotifyClientProtocol, MusicBrainzClientProtocol, LastFMClientProtocol
+from collecter.clients.downloader import DownloadCandidate, DownloaderClientProtocol
 
 
 class FakeSpotifyClient:
@@ -30,3 +31,27 @@ class FakeMusicBrainzClient:
 
 class FakeLastFMClient:
     def get_track(self, artist: str, title: str): ...
+
+
+class FakeDownloaderClient:
+    """Configurable per-test fake for DownloaderClientProtocol - set
+    .candidates[spotify_id] / .failures[spotify_id] / .paths[spotify_id]
+    before use; download.py's orchestration tests need this, not a real
+    spotdl call."""
+
+    def __init__(self):
+        self.candidates: dict[str, DownloadCandidate | None] = {}
+        self.failures: dict[str, Exception] = {}
+        self.paths: dict[str, str] = {}
+
+    async def search(self, spotify_id: str) -> DownloadCandidate | None:
+        return self.candidates.get(
+            spotify_id, DownloadCandidate(spotify_id, "Test Song", "Test Artist", _song=None)
+        )
+
+    async def download(self, candidate: DownloadCandidate):
+        from pathlib import Path
+
+        if candidate.spotify_id in self.failures:
+            raise self.failures[candidate.spotify_id]
+        return Path(self.paths.get(candidate.spotify_id, f"/downloads/{candidate.spotify_id}.wav"))

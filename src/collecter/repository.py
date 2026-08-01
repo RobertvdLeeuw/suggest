@@ -94,6 +94,14 @@ class Repository(Protocol):
         self, queue_model: type[QueueJukeMIR] | type[QueueAuditus], spotify_id: str
     ) -> None: ...
 
+    async def get_queued_track_ids(
+        self, queue_model: type[QueueJukeMIR] | type[QueueAuditus], limit: int
+    ) -> list[str]:
+        """Oldest-queued-first spotify_ids still waiting in queue_model's DB
+        table, up to limit. Used by download.py to decide what to download -
+        see its module docstring."""
+        ...
+
     async def get_random_artists(self, n: int) -> list[Artist]: ...
 
     async def mark_artist_metadata_pending(self, artist_id: int, sources: set[str]) -> None: ...
@@ -363,6 +371,17 @@ class SqlAlchemyRepository:
             )
 
         await self._run_transactional(_unit)
+
+    async def get_queued_track_ids(
+        self, queue_model: type[QueueJukeMIR] | type[QueueAuditus], limit: int
+    ) -> list[str]:
+        if limit <= 0:
+            return []
+
+        result = await self._session.execute(
+            select(queue_model.spotify_id).order_by(queue_model.created_at.asc()).limit(limit)
+        )
+        return list(result.scalars().all())
 
     # --- Random sampling (queue_similar_artists) ---------------------------
 
