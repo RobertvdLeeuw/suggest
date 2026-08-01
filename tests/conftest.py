@@ -1,142 +1,57 @@
-import pytest
-import asyncio
-from contextlib import asynccontextmanager
-import sys
-import os
-import uuid
-from typing import AsyncGenerator
-from sqlalchemy import text, URL
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+# Shared fixture inventory for the whole suite. Nothing here is implemented yet -
+# each block below is one fixture, described the same way test stubs describe
+# assertions: what it needs to do, then what it needs to touch.
+#
+# Scope reminder: unit/ should never depend on the DB fixtures - only
+# integration/ (and the multiprocess test in integration/test_embedding_pipeline.py)
+# needs a real Postgres.
 
+# --- DB fixtures (integration/ only) ----------------------------------------
 
-# Add src to path so imports work
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+# postgresql_proc: single PostgreSQL instance for the whole test session.
+# touches: pytest_postgresql.factories.postgresql_proc
 
-from models import Base
+# event_loop: session-scoped asyncio event loop.
+# touches: asyncio.get_event_loop_policy
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create an instance of the default event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# isolated_test_db: fresh, uniquely-named DB per test function, schema created via
+# models.Base, torn down after. Sets/restores TEST_MODE, TEST_DATABASE_NAME,
+# POSTGRES_HOST/PORT/USER env vars around the test so db.get_session() picks it up.
+# touches: pytest_postgresql.janitor.DatabaseJanitor, sqlalchemy.ext.asyncio.create_async_engine,
+#          models.Base.metadata.create_all, db.DatabaseManager.cleanup_all_instances
 
+# db_session: AsyncSession bound to isolated_test_db's engine.
+# touches: sqlalchemy.ext.asyncio.async_sessionmaker, AsyncSession
 
-@pytest.fixture(scope="function")
-def unique_test_db_name():
-    """Generate a unique database name for this test."""
-    # Include test node info for parallel test support
-    test_id = str(uuid.uuid4())[:8]
-    worker_id = os.environ.get('PYTEST_XDIST_WORKER', 'main')
-    return f"test_db_{worker_id}_{test_id}"
+# test_db: convenience fixture exposing just the db_name from isolated_test_db.
 
+# --- Fake-backed fixtures (unit/ + integration/ orchestration tests) -------
 
-@pytest.fixture(scope="function") 
-async def admin_engine():
-    """Create an engine connected to the default postgres database for admin operations."""
-    admin_url = URL.create(
-        drivername='postgresql+asyncpg',
-        username=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ["POSTGRES_HOST"],
-        port=int(os.environ["DB_PORT"]),
-        database='postgres'  # Connect to default postgres db for admin operations
-    )
-    
-    engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
-    yield engine
-    await engine.dispose()
+# fake_repo: fresh mocks.repository.FakeRepository() per test, real in-memory
+# get_or_create-style dedup semantics (not '...' stubs) - services.py's
+# repo-lookup-before-resolve tests depend on the second lookup actually hitting.
+# touches: mocks.repository.FakeRepository
 
+# fake_clients: bundles a fresh (spotify, musicbrainz, lastfm) fake triple from
+# mocks.clients, since most resolution.py/services.py tests need all three even
+# when only one is under test.
+# touches: mocks.clients.FakeSpotifyClient, FakeMusicBrainzClient, FakeLastFMClient
 
-@asynccontextmanager
-async def get_isolated_test_db():
-    """Context manager that creates an isolated test database for each use.
-    
-    This is designed for use with Hypothesis property-based tests where each
-    generated test case needs its own fresh database.
-    """
-    # Generate unique database name
-    test_id = str(uuid.uuid4())[:8]
-    worker_id = os.environ.get('PYTEST_XDIST_WORKER', 'main')
-    db_name = f"test_db_{worker_id}_{test_id}"
-    
-    # Set environment variable so production code uses test database
-    old_test_db = os.environ.get("TEST_DATABASE_NAME")
-    os.environ["TEST_DATABASE_NAME"] = db_name
-    
-    # Create admin engine for database operations
-    admin_url = URL.create(
-        drivername='postgresql+asyncpg',
-        username=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
-        host=os.environ["POSTGRES_HOST"],
-        port=int(os.environ["DB_PORT"]),
-        database='postgres'
-    )
-    
-    admin_engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
-    
-# try:
-    # Create the test database
-    async with admin_engine.connect() as conn:
-        # Terminate any existing connections to the database
-        await conn.execute(text(f"""
-            SELECT pg_terminate_backend(pid)
-            FROM pg_stat_activity
-            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
-        """))
-        
-        # Drop database if it exists (cleanup from failed previous run)
-        import logging
-        logging.debug(f"Dropping database '{db_name}'.")
-        await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
-        
-        # Create new database
-        logging.debug(f"Creating database '{db_name}'.")
-        await conn.execute(text(f"CREATE DATABASE {db_name}"))
-    
-    # Import db_manager AFTER setting the environment variable
-    from db import db_manager, DatabaseManager
-    
-    # Reset the global instance to pick up the new database name
-    await db_manager.cleanup()
-    DatabaseManager._instance = None
-    DatabaseManager._initialized = False
-    
-    # Initialize with the test database
-    await db_manager.initialize()
-    
-    # Set up the database schema
-    engine = await db_manager.get_engine()
-    async with engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
-        await conn.run_sync(Base.metadata.create_all)
-    
-    yield db_manager
-    
-# finally:
-    # Cleanup: close all connections and drop the database
-    from collecter.embedders import end_processes
-    end_processes()
-    await db_manager.cleanup()
-    
-    # Restore environment variable
-    if old_test_db is not None:
-        os.environ["TEST_DATABASE_NAME"] = old_test_db
-    else:
-        os.environ.pop("TEST_DATABASE_NAME", None)
-    
-    # Drop the test database
-    async with admin_engine.connect() as conn:
-        # Terminate any remaining connections
-        await conn.execute(text(f"""
-            SELECT pg_terminate_backend(pid)
-            FROM pg_stat_activity
-            WHERE datname = '{db_name}' AND pid <> pg_backend_pid()
-        """))
-        
-        # Drop the database
-        await conn.execute(text(f"DROP DATABASE IF EXISTS {db_name}"))
-    
-    await admin_engine.dispose()
+# fake_downloader: fresh mocks.clients.FakeDownloaderClient() per test.
+# touches: mocks.clients.FakeDownloaderClient
 
+# --- Filesystem fixtures -----------------------------------------------------
+
+# tmp_download_dir: real empty directory (tmp_path-based) standing in for
+# download_dir - needed anywhere touching match_on_disk/plan_cleanup/download_loop's
+# os.listdir, without ever writing outside pytest's tmp tree.
+# touches: pytest tmp_path
+
+# --- Markers -----------------------------------------------------------------
+
+# Register in pyproject.toml/pytest.ini, not here, but noting the contract:
+#   slow        - real multiprocessing / long-running (integration/test_song_queue_concurrency.py,
+#                 integration/test_embedding_pipeline.py)
+#   collecter   - anything under this package, mirrors old pytestmark convention
+#   integration - anything needing a real DB or real subprocesses
+# unit/ should be runnable with none of these selected, fast, no external state.
