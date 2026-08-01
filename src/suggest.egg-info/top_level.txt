@@ -1,5 +1,0 @@
-collecter
-db
-logger
-models
-suggester
