@@ -12,7 +12,7 @@ __marimo__/
 tmp.py
 testresults.txt
 
-src/music_embed.egg-info/
+**/music_embed.egg-info/
 src/music_embed.egg-info/*
 spotify_data_isrc.json
 
