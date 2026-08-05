@@ -1,28 +1,27 @@
-import traceback
 import logging
+import traceback
+
 LOGGER = logging.getLogger(__name__)
 
+import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-from sqlalchemy import select, delete
-from db import get_session, setup
-
-from spotdl.types.options import DownloaderOptions
-
-from collecter.embedders import SongQueue, QUEUE_MAX_LEN
-from collecter.metadata import (
-    simple_queue_new_music, 
-    create_push_track,
-    _get_sp_album_tracks,
-    _add_to_db_queue,
-    get_spotipy
-)
-from spotdl.providers.audio.base import AudioProviderError
 from spotdl.download.downloader import DownloaderError
+from spotdl.providers.audio.base import AudioProviderError
+from spotdl.types.options import DownloaderOptions
+from sqlalchemy import delete, select
+
+from collecter.embedders import QUEUE_MAX_LEN, SongQueue
+from collecter.metadata import (
+    _add_to_db_queue,
+    _get_sp_album_tracks,
+    create_push_track,
+    get_spotipy,
+    simple_queue_new_music,
+)
+from db import get_session, setup
 
 DOWNLOAD_LOC = None
 Spotdl = None
@@ -43,8 +42,11 @@ def spotdl_lazy_load():
 
     Spotdl = _Spotdl
 
+
 CURRENTLY_DOWNLOADING = set()
-async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downloader):
+
+
+async def _download(spotify_id: str, song_queue: SongQueue):  # , downloader: Downloader):
     if spotify_id in CURRENTLY_DOWNLOADING:
         return
 
@@ -60,14 +62,13 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         asyncio.create_task(create_push_track(spotify_id))
 
         spotdl_lazy_load()
-        spotdl = Spotdl( 
+        spotdl = Spotdl(
             no_cache=True,
             spotify_client=get_spotipy(),
-            downloader_settings=DownloaderOptions(format="wav", 
-                                                  simple_tui=False,
-                                                  print_download_errors=False,
-                                                  output="./downloading"),
-            loop=asyncio.get_event_loop()
+            downloader_settings=DownloaderOptions(
+                format="wav", simple_tui=False, print_download_errors=False, output="./downloading"
+            ),
+            loop=asyncio.get_event_loop(),
         )
         song = spotdl.search(["https://open.spotify.com/track/" + spotify_id])[0]
 
@@ -76,7 +77,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
             return
 
         LOGGER.info(f"Song found for '{spotify_id}: {song.name} by {song.artist}")
-        
+
         try:
             _, file_path = spotdl.download(song)
             assert file_path and os.path.exists(file_path)
@@ -85,8 +86,9 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
 
             async with get_session() as s:
                 # Remove from queue
-                result = await s.execute(delete(song_queue.q_type)
-                                         .where(song_queue.q_type.spotify_id == spotify_id))
+                result = await s.execute(
+                    delete(song_queue.q_type).where(song_queue.q_type.spotify_id == spotify_id)
+                )
                 await s.commit()
 
             CURRENTLY_DOWNLOADING.remove(spotify_id)
@@ -100,7 +102,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
         file_path = str(with_id)
 
         file_size = os.path.getsize(file_path)
-        LOGGER.debug(f"Download completed: {file_path} ({file_size / (1024*1024):.2f} MB).")
+        LOGGER.debug(f"Download completed: {file_path} ({file_size / (1024 * 1024):.2f} MB).")
 
         LOGGER.debug(f"Adding {file_path} to processing queues.")
         song_queue.put((file_path, spotify_id))
@@ -115,6 +117,7 @@ async def _download(spotify_id: str, song_queue: SongQueue):#, downloader: Downl
     except Exception as e:
         LOGGER.warning(f"Downloading song '{spotify_id}' failed: {traceback.format_exc()}")
         CURRENTLY_DOWNLOADING.remove(spotify_id)
+
 
 async def start_download_loop(song_queues: list[SongQueue]):
     global DOWNLOAD_LOC
@@ -136,14 +139,16 @@ async def start_download_loop(song_queues: list[SongQueue]):
                 async with get_session() as s:
                     n = QUEUE_MAX_LEN - len(q)
 
-                    queue_items = await s.execute(select(q.q_type.spotify_id)
-                                                  .order_by(q.q_type.created_at.asc())
-                                                  .limit(n))
+                    queue_items = await s.execute(
+                        select(q.q_type.spotify_id).order_by(q.q_type.created_at.asc()).limit(n)
+                    )
                     queue_items = queue_items.scalars().all()
                     LOGGER.debug(f"Found {len(queue_items)} queue items for {q.name}.")
 
                 if len(queue_items) < n:
-                    LOGGER.info(F"Queue of {q.name} almost empty, collecting new music (once implemented).")
+                    LOGGER.info(
+                        f"Queue of {q.name} almost empty, collecting new music (once implemented)."
+                    )
                     # asyncio.create_task(simple_queue_new_music())
 
                 for db_q_item in list(queue_items):
@@ -155,11 +160,14 @@ async def start_download_loop(song_queues: list[SongQueue]):
                         if db_q_item in file_name:
                             if db_q_item not in q:
                                 q.put((f"{DOWNLOAD_LOC}/{file_name}", db_q_item))
-                                LOGGER.debug(f"Song '{file_name}' was downloaded before, " \
-                                             "inserting into local queue.")
+                                LOGGER.debug(
+                                    f"Song '{file_name}' was downloaded before, "
+                                    "inserting into local queue."
+                                )
                             else:
-                                LOGGER.debug(f"Skipping download for '{db_q_item}' - " \
-                                             "already downloaded.")
+                                LOGGER.debug(
+                                    f"Skipping download for '{db_q_item}' - already downloaded."
+                                )
 
                             queue_items.remove(db_q_item)
 
@@ -167,18 +175,19 @@ async def start_download_loop(song_queues: list[SongQueue]):
 
                 _ = asyncio.gather(*[_download(q_item, q) for q_item in queue_items])
 
-
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
             except Exception as e:
                 LOGGER.error(f"Error in download loop: {traceback.format_exc()}")
 
-    
+
 def clean_downloads(song_queues: list):
     global DOWNLOAD_LOC
     DOWNLOAD_LOC = "./mock_downloads" if os.getenv("TEST_MODE") else "./downloads"
 
-    LOGGER.info(f"Cleaning downloads folder ({DOWNLOAD_LOC}), {len(os.listdir(DOWNLOAD_LOC))} downloaded files.")
+    LOGGER.info(
+        f"Cleaning downloads folder ({DOWNLOAD_LOC}), {len(os.listdir(DOWNLOAD_LOC))} downloaded files."
+    )
 
     cnt = 0
     q_spotify_ids = [x[1] for q in song_queues for x in q.peek_all()]
@@ -192,18 +201,22 @@ def clean_downloads(song_queues: list):
             os.remove(os.path.join(DOWNLOAD_LOC, file))
             cnt += 1
 
-    LOGGER.info(f"Finished cleaning downloads folder, " \
-                f"removed {cnt} files ({len(os.listdir(DOWNLOAD_LOC))} left).")
+    LOGGER.info(
+        f"Finished cleaning downloads folder, "
+        f"removed {cnt} files ({len(os.listdir(DOWNLOAD_LOC))} left)."
+    )
 
 
 async def test():
     await setup()
     # await _download("4sZgFgFZPIwcqDJ4FKJXD2", SongQueue("test", None))
 
-    from models import QueueJukeMIR, QueueAuditus
+    from models import QueueAuditus, QueueJukeMIR
+
     async with get_session() as s:
         x = await s.execute(select(QueueAuditus))
         print("X:", x.scalars().all())
+
 
 if __name__ == "__main__":
     asyncio.run(test())

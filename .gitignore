@@ -8,6 +8,8 @@ mock_downloads/
 
 .hypothesis/
 
+**/old/
+
 src/music_embed.egg-info/
 src/music_embed.egg-info/*
 spotify_data_isrc.json

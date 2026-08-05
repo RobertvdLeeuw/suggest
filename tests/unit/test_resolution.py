@@ -6,7 +6,7 @@
 # LastFM->Spotify->MusicBrainz conversion maintain transitivity
 # (if A->B and B->C, then A should relate to C somehow)
 # (if A->B, then B->A should also work)
-    # Essentially, all transitions from one API to another should result in equivalent items.
+# Essentially, all transitions from one API to another should result in equivalent items.
 # touches: collecter.resolution.resolve_artist, collecter.resolution._sp_artist_to_lastfm,
 #          collecter.resolution._lastfm_to_sp, collecter.resolution._sp_artist_to_mb,
 #          mocks.clients.FakeSpotifyClient/FakeMusicBrainzClient/FakeLastFMClient

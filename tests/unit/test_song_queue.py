@@ -1,27 +1,29 @@
 """
 SongQueue's logical contract (dedup on put, FIFO get, peek doesn't mutate,
 len stays accurate) tested as a single hypothesis.stateful.RuleBasedStateMachine,
-parametrized over two backing implementations:
+run against ONE backing implementation:
 
   - mocks.song_queue_double.SongQueueDouble - deque + threading primitives,
     no multiprocessing.Manager() subprocess spin-up. Run at hypothesis's
     normal/generous step budget - this is where volume of explored
-    put/get/remove/peek interleavings actually finds bugs.
-  - collecter.embedders.song_queue.SongQueue (the real class) - run at a
-    small, capped budget. Not redundant with the double: catches anything
-    that depends on going through Manager().list()'s proxying (e.g. dedup
-    relying on equality vs identity across the proxy boundary) that a local
-    deque can't surface. Kept small specifically because Manager() spin-up
-    cost is real and hypothesis's value here is confirmatory, not exploratory.
+    put/get/remove/peek interleavings actually finds logic bugs.
 
-Real cross-process guarantees (no deadlock, no lost items under actual
-concurrent OS processes) are explicitly NOT covered here - see
-integration/test_song_queue_concurrency.py.
+Scope note (post-slimdown): we previously also ran this same state machine
+against the real collecter.embedders.song_queue.SongQueue class at a capped
+budget, on the theory that Manager().list() proxying might behave
+differently from a local deque (e.g. dedup relying on equality vs identity
+across the proxy boundary). Cut that second run: SongQueueDouble and the
+real SongQueue implement the identical dedup/FIFO contract by construction
+(same "item in self.queue" check, same list semantics), so a second
+Hypothesis run over the real class was mostly re-confirming what the double
+already proved, at real Manager()-subprocess cost. The one thing the double
+genuinely can't cover - correctness under actual concurrent OS processes -
+is handled by integration/test_song_queue_concurrency.py's example-based
+tests instead, which is a better tool for that question than a stateful
+machine anyway.
 """
 
-# SongQueueContract(RuleBasedStateMachine): shared rule set + invariants,
-# instantiated once per backing implementation via a fixture/factory bundle
-# rather than duplicated per-class.
+# SongQueueContract(RuleBasedStateMachine): shared rule set + invariants.
 #
 # rules needed: put(item), get() [only when known non-empty, to avoid the
 # 30s-timeout path dominating run time - track "known items" as the state
@@ -42,12 +44,10 @@ integration/test_song_queue_concurrency.py.
 #     model exactly (as a set - real class doesn't guarantee order beyond
 #     FIFO for get(), peek_all() is a snapshot).
 #
-# touches: collecter.embedders.song_queue.SongQueue, mocks.song_queue_double.SongQueueDouble,
+# touches: mocks.song_queue_double.SongQueueDouble,
 #          strategies.queue.song_queue_item_strat, hypothesis.stateful.RuleBasedStateMachine
 
 # test_song_queue_double_contract: runs SongQueueContract against
-# SongQueueDouble at normal hypothesis settings (generous step count).
-
-# test_song_queue_real_contract: runs SongQueueContract against the real
-# SongQueue at a small capped step count, @pytest.mark.slow (still faster
-# than the double's full run, but not free given Manager() spin-up).
+# SongQueueDouble at normal hypothesis settings (generous step count). This
+# is now the only test in this file - real-class + real-multiprocess
+# confidence comes from integration/test_song_queue_concurrency.py instead.

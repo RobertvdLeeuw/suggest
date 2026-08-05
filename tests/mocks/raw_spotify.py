@@ -37,8 +37,5 @@ defaults per-method, not by hand-editing the fixtures.
 #          SPOTIFY_CURRENT_PLAYBACK, SPOTIFY_QUEUE),
 #          spotipy.exceptions.SpotifyException (for injected 429/5xx/4xx)
 
-# RawSpotifyOAuth: minimal double for spotipy.oauth2.SpotifyOAuth, only if
-# clients/spotify.py's token-refresh behavior ends up being something we
-# test at this layer at all (see test_clients.py's note on this - spotipy
-# handles refresh internally, may not be ours to test).
-# touches: spotipy.oauth2.SpotifyOAuth's public surface (refresh_access_token, get_access_token)
+# (Dropped: RawSpotifyOAuth. Confirmed token-refresh is entirely spotipy's own
+# contract to uphold, not collecter's - see test_clients.py.)
