@@ -297,7 +297,7 @@ class SqlAlchemyRepository:
         A track with no Song row yet (never pushed) obviously has no embeddings
         either, and queues normally for both. A track embedded by one embedder
         but not the other still queues for the one that's missing."""
-        from models import EmbeddingAuditus, EmbeddingJukeMIR, QueueAuditus, QueueJukeMIR
+        from ..models import EmbeddingAuditus, EmbeddingJukeMIR, QueueAuditus, QueueJukeMIR
 
         if not spotify_track_ids:
             return

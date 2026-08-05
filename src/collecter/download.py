@@ -164,7 +164,9 @@ async def download_loop(
             LOGGER.error(f"Error in download loop: {traceback.format_exc()}")
 
 
-async def _clean_downloads(song_queues: list[SongQueue], state: DownloadState, download_dir: str) -> int:
+async def _clean_downloads(
+    song_queues: list[SongQueue], state: DownloadState, download_dir: str
+) -> int:
     """Deletes any downloaded file not protected by an in-flight download or
     a still-pending item in some queue's local SongQueue. Called from inside
     download_loop on a timer (see cleanup_interval_s) rather than a separate

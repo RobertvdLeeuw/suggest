@@ -213,7 +213,13 @@ SPOTIFY_TRACK = {
 
 SPOTIFY_CURRENT_USER = {"display_name": "BigLittle", "id": "randomstring"}
 
-SPOTIFY_PLAYLIST = {
+# NOTE: originally named SPOTIFY_PLAYLIST, but this is the shape of a tracks
+# *page* (what GET /playlists/{id}/tracks returns), not a full playlist
+# envelope - real playlist objects nest this under a top-level "tracks" key,
+# which is what SpotifyClient.playlist() (clients/spotify.py) actually reads
+# (playlist["tracks"]["items"]/["next"]). Renamed to match what it actually
+# is; see SPOTIFY_PLAYLIST below for the wrapped envelope playlist() needs.
+SPOTIFY_PLAYLIST_ITEMS = {
     "href": "https://api.spotify.com/v1/playlists/6AmmzGkRimiqVqOzvLe2XV/tracks?offset=0&limit=2&additional_types=track",
     "items": [
         {
@@ -366,6 +372,18 @@ SPOTIFY_PLAYLIST = {
     "offset": 0,
     "previous": None,
     "total": 84,
+}
+
+# Thin, deliberately synthetic envelope around SPOTIFY_PLAYLIST_ITEMS - the
+# only real (captured) data here is the tracks page it wraps.
+# SpotifyClient.playlist() never reads id/name/owner, only playlist["tracks"],
+# so there was nothing to capture faithfully for those fields; don't add to
+# them without checking whether something downstream starts relying on them.
+SPOTIFY_PLAYLIST = {
+    "id": "6AmmzGkRimiqVqOzvLe2XV",
+    "name": "Test Playlist",
+    "owner": {"id": "1192119558", "display_name": "BigLittle"},
+    "tracks": SPOTIFY_PLAYLIST_ITEMS,
 }
 
 SPOTIFY_SAVED_TRACKS = {
