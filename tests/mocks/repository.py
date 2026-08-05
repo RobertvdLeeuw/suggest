@@ -1,29 +1,38 @@
-"""In-memory implementation of the Repository Protocol - dict-backed, no DB.
-Lets services.py orchestration be tested (e.g. lookup-before-resolve ordering)
-without a real Postgres instance. The real race-condition guarantees of
-get_or_create are NOT re-tested here - that's what tests/integration/
-test_repository.py + a real DB is for."""
+"""
+In-memory implementation of the Repository Protocol - dict-backed, no DB.
+Lets services.py orchestration be tested (e.g. lookup-before-resolve
+ordering, unavailable-source bookkeeping) without a real Postgres instance.
 
-from models import Artist, Song, User, Listen, ArtistMetadata, SongMetadata
+The real race-condition/transactional guarantees of get_or_create are NOT
+re-tested here - that's what integration/test_repository.py + a real DB is
+for. This fake's job is correct *sequential* semantics only.
+"""
 
-
-class FakeRepository:
-    def __init__(self):
-        ...
-
-    async def get_artist_by_spotify_id(self, spotify_id: str) -> Artist | None: ...
-    async def create_artist(self, artist: Artist, metadata: list[ArtistMetadata]) -> Artist: ...
-
-    async def get_song_by_spotify_id(self, spotify_id: str) -> Song | None: ...
-    async def create_song(self, song: Song, metadata: list[SongMetadata]) -> Song: ...
-
-    async def get_or_create_user(self, spotify_id: str, username: str) -> User: ...
-
-    async def add_listen(self, user_id: int, song_id: int, listen_data: dict) -> Listen: ...
-
-    async def enqueue_tracks(self, spotify_track_ids: list[str]) -> None: ...
-
-    async def save_embeddings(self, embeddings: list) -> None: ...
-    async def is_song_embedded(self, song_id: int, embedding_model: type) -> bool: ...
-    async def dequeue_track(self, queue_model: type, spotify_id: str) -> None: ...
-    async def get_queued_track_ids(self, queue_model: type, limit: int) -> list[str]: ...
+# FakeRepository: implements the Repository Protocol (collecter.repository.Repository).
+#
+# needs real (not '...' stub) in-memory behavior for:
+#   - get_artist_by_spotify_id / create_artist: second lookup after a create
+#     must return the same object - services.py's push_artist tests depend on
+#     this actually short-circuiting the resolve call on a repeat push.
+#   - get_song_by_spotify_id / create_song: same repeat-lookup requirement.
+#   - get_or_create_user
+#   - add_listen: needs to store ListenChunks alongside the Listen, since
+#     listen_tracking-adjacent tests check chunk persistence.
+#   - enqueue_tracks / dequeue_track / get_queued_track_ids: real queue-table
+#     semantics per embedder (JukeMIR/Auditus separately) - enqueue must skip
+#     ids already embedded for that embedder, matching the real
+#     SqlAlchemyRepository.enqueue_tracks docstring's contract.
+#   - save_embeddings / is_song_embedded
+#   - get_random_artists
+#   - mark_/clear_artist_metadata_pending, get_stale_pending_artists
+#   - mark_/clear_song_metadata_pending, get_stale_pending_songs
+#     (idempotent mark/clear - double-mark and double-clear must be no-ops,
+#     not errors, matching the real repository's documented contract)
+#
+# needs a .calls log (method name + args) same as mocks/clients.py's fakes,
+# for services.py's ordering assertions.
+#
+# touches: collecter.repository.Repository (the Protocol),
+#          models.Artist, Song, User, Listen, ListenChunk, ArtistMetadata,
+#          SongMetadata, PendingArtistMetadata, PendingSongMetadata,
+#          QueueJukeMIR, QueueAuditus, EmbeddingJukeMIR, EmbeddingAuditus

@@ -1,57 +1,42 @@
-"""Fake implementations of the SpotifyClientProtocol/MusicBrainzClientProtocol/
-LastFMClientProtocol trio, for tests that need resolution.py or services.py
-behavior without any real network call. Configurable per-test rather than
-random, unlike the old tests/mocks/apis.py fakes - hypothesis strategies drive
-the randomness instead, these just need to return what they're told to."""
+"""
+Fake implementations of SpotifyClientProtocol/MusicBrainzClientProtocol/
+LastFMClientProtocol/DownloaderClientProtocol (see collecter.clients and
+collecter.clients.downloader) - the layer resolution.py/services.py/
+download.py code against. Configurable per-test, not random - hypothesis
+strategies (strategies/resolution.py, strategies/download.py) drive the
+randomness, these just return what they're told to.
 
-from collecter.clients import SpotifyClientProtocol, MusicBrainzClientProtocol, LastFMClientProtocol
-from collecter.clients.downloader import DownloadCandidate, DownloaderClientProtocol
+Distinct from mocks/raw_*.py: those fake the third-party libraries
+(spotipy/musicbrainzngs/pylast) one layer further down, for testing OUR
+wrapper code in clients/*.py. Nothing here should import spotipy,
+musicbrainzngs, or pylast.
+"""
 
+# FakeSpotifyClient: implements SpotifyClientProtocol.
+# needs:
+#   - per-test configurable returns/exceptions keyed by (method_name, args) or
+#     just method_name if args don't matter for a given test.
+#   - a .calls: list[tuple[str, tuple, dict]] call log - services.py's
+#     "doesn't call resolve when repo already has it" ordering assertions
+#     need call-count/call-presence checks on these fakes, not just return values.
+# touches: collecter.clients.SpotifyClientProtocol (structural conformance)
 
-class FakeSpotifyClient:
-    def artist(self, artist_id: str) -> dict: ...
-    def artist_top_tracks(self, artist_id: str) -> dict: ...
-    def track(self, track_id: str) -> dict: ...
-    def search(self, query: str, type: str) -> dict: ...
-    def current_user(self) -> dict: ...
-    def current_user_saved_tracks(self, limit: int) -> dict: ...
-    def current_user_playlists(self, limit: int) -> dict: ...
-    def playlist(self, playlist_id: str) -> dict: ...
-    def album_tracks(self, album_id: str, limit: int) -> dict: ...
-    def artist_albums(self, artist_id: str, limit: int) -> dict: ...
-    def current_playback(self) -> dict | None: ...
-    def queue(self) -> dict: ...
+# FakeMusicBrainzClient: implements MusicBrainzClientProtocol. Same shape as above.
+# touches: collecter.clients.MusicBrainzClientProtocol
 
+# FakeLastFMClient: implements LastFMClientProtocol. Same shape as above.
+# touches: collecter.clients.LastFMClientProtocol
 
-class FakeMusicBrainzClient:
-    def search_recordings(self, query: str) -> dict: ...
-    def get_artist_by_id(self, artist_id: str, includes: list[str]) -> dict: ...
-    def get_recording_by_id(self, recording_id: str, includes: list[str]) -> dict: ...
+# FakeDownloaderClient: implements DownloaderClientProtocol - .search()/.download()
+# configurable per spotify_id via .candidates/.failures/.paths dicts (this part of
+# the pre-refactor shape was already reasonable, worth keeping the interface).
+# needs a .calls log too, for download.py's fan-out assertions (one search+download
+# per distinct spotify_id, even when multiple queues want it).
+# touches: collecter.clients.downloader.DownloaderClientProtocol,
+#          collecter.clients.downloader.DownloadCandidate,
+#          collecter.clients.downloader.DOWNLOAD_ERRORS
 
-
-class FakeLastFMClient:
-    def get_track(self, artist: str, title: str): ...
-
-
-class FakeDownloaderClient:
-    """Configurable per-test fake for DownloaderClientProtocol - set
-    .candidates[spotify_id] / .failures[spotify_id] / .paths[spotify_id]
-    before use; download.py's orchestration tests need this, not a real
-    spotdl call."""
-
-    def __init__(self):
-        self.candidates: dict[str, DownloadCandidate | None] = {}
-        self.failures: dict[str, Exception] = {}
-        self.paths: dict[str, str] = {}
-
-    async def search(self, spotify_id: str) -> DownloadCandidate | None:
-        return self.candidates.get(
-            spotify_id, DownloadCandidate(spotify_id, "Test Song", "Test Artist", _song=None)
-        )
-
-    async def download(self, candidate: DownloadCandidate):
-        from pathlib import Path
-
-        if candidate.spotify_id in self.failures:
-            raise self.failures[candidate.spotify_id]
-        return Path(self.paths.get(candidate.spotify_id, f"/downloads/{candidate.spotify_id}.wav"))
+# Protocol-conformance check: worth a cheap static assertion (not a full test)
+# that each Fake* actually satisfies its Protocol's method signatures, so a
+# Protocol change doesn't silently leave a fake out of sync.
+# touches: typing.get_type_hints or similar, one assert per Fake*/Protocol pair
