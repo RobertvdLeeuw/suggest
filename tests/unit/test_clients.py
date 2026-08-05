@@ -2,12 +2,10 @@
 # touches: collecter.clients.spotify.SpotifyClient, collecter.clients.spotify._classify,
 #          mocks.raw_spotify.RawSpotify (injecting 429 + Retry-After)
 
-# API Tokens are always refreshed before expiration.
-# touches: collecter.clients.spotify.SpotifyClient (via spotipy.oauth2.SpotifyOAuth)
-# QUESTIONABLE: spotipy's SpotifyOAuth handles refresh internally - unclear whether
-# there's any of our own code left to actually test here, or whether this is really
-# spotipy's contract to uphold, not ours. Confirm before writing real assertions;
-# may end up deleted rather than implemented.
+# (Dropped: token-refresh-before-expiration test. Confirmed spotipy's SpotifyOAuth
+# handles refresh entirely internally - there's no collecter-owned behavior left here
+# to assert on, we'd just be testing spotipy. RawSpotifyOAuth double in
+# mocks/raw_spotify.py is dropped along with it.)
 
 # API calls that return paginated data are always collected in their entirety.
 # touches: collecter.clients.spotify.SpotifyClient (methods that loop page["next"]),

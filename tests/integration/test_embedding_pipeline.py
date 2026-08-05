@@ -21,14 +21,10 @@ Needs a real DB (conftest.db_session) AND real worker processes
 # touches: collecter.embedders (the _async_embed_wrapper loop), conftest.db_session
 # @pytest.mark.slow
 
-# Embedding worker processes never deadlock when accessing shared SongQueues under
-# real concurrent load from multiple embedders (JukeMIR + Auditus simultaneously).
-# touches: collecter.embedders.start_processes, collecter.embedders.song_queue.SongQueue
-# @pytest.mark.slow
-# NOTE: this is really integration/test_song_queue_concurrency.py's territory (SongQueue
-# under real multiprocess load) rather than a separate embedding-pipeline concern -
-# consider merging into that file once both are written, to avoid two places asserting
-# roughly the same thing with different setup.
+# (Moved to integration/test_song_queue_concurrency.py: "no deadlock across multiple
+# real processes sharing a SongQueue" is SongQueue's territory, not the embedding
+# pipeline's - that file now owns the assertion, exercised via multiple embedder-shaped
+# processes rather than duplicating setup here.)
 
 # System resource usage (disk space) stays within bounds during a sustained processing
 # run - downloaded files never accumulate unbounded even under continuous queueing.

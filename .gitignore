@@ -9,11 +9,9 @@ mock_downloads/
 .hypothesis/
 __marimo__/
 
-tmp.py
-testresults.txt
-
 **/music_embed.egg-info/
-src/music_embed.egg-info/*
+**/old/
+
 spotify_data_isrc.json
 
 # General
